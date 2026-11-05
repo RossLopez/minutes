@@ -24,6 +24,7 @@ final class RecordingController {
     private static let meterDecay: Float = 0.85
     /// About every 10 seconds at the meter's rate.
     private static let ticksPerDiskCheck = 150
+    private static let startStallLimit = Duration.seconds(15)
 
     private(set) var phase = Phase.idle
     private(set) var elapsedSeconds = 0
@@ -123,6 +124,14 @@ final class RecordingController {
             }
         }
 
+        let watchdog = Task { [weak self] in
+            try await Task.sleep(for: Self.startStallLimit)
+            self?.handleStalledStart()
+        }
+        defer {
+            watchdog.cancel()
+        }
+
         do {
             meeting = try await makeMeeting()
             beginRecordingState()
@@ -146,6 +155,18 @@ final class RecordingController {
         return try await ActiveMeeting(library: library, useFakeAudio: useFakeAudio, events: events)
     }
 
+    /// Opening an input can block for as long as the Mac's audio service doesn't answer, and it
+    /// can't be cancelled. See "Starting can hang" in docs/NOTES.md.
+    private func handleStalledStart() {
+        guard phase == .starting else {
+            return
+        }
+        Self.logger.error("Recording hasn't started after \(Self.startStallLimit, privacy: .public)")
+        if RecordingAlerts.askToQuitAfterStalledStart(), phase == .starting {
+            NSApplication.shared.terminate(nil)
+        }
+    }
+
     private func beginRecordingState() {
         // Keeps the Mac awake and marks this work as important. The display can still sleep.
         activity = ProcessInfo.processInfo.beginActivity(
@@ -164,6 +185,9 @@ final class RecordingController {
             }
         }
         Self.logger.info("Recording started")
+        #if DEBUG
+            SelfSoundTest.startIfRequested()
+        #endif
     }
 
     private func ensurePermissions() async -> Bool {
@@ -260,15 +284,18 @@ final class RecordingController {
         activity = nil
         phase = .idle
     }
+}
 
-    // MARK: - Quitting
+// MARK: - Quitting and recovery
 
+extension RecordingController {
     func handleTerminationRequest() -> NSApplication.TerminateReply {
         switch phase {
         case .idle:
             return .terminateNow
         case .starting:
-            return .terminateCancel
+            // Nothing is recorded yet, and a stalled start must never trap the user in the app.
+            return .terminateNow
         case .recording:
             guard RecordingAlerts.confirmQuitWhileRecording() else {
                 return .terminateCancel
@@ -283,8 +310,6 @@ final class RecordingController {
             return RecordingAlerts.confirmQuitWhileSaving() ? .terminateNow : .terminateCancel
         }
     }
-
-    // MARK: - Recovery
 
     func recoverUnfinishedMeetings() async {
         guard phase == .idle else {

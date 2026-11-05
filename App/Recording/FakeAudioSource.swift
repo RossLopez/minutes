@@ -1,8 +1,25 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #if DEBUG
-    import Foundation
+    import AppKit
     import MinutesAudio
+
+    /// Plays a sound through Minutes itself while recording, to check that the system track leaves
+    /// it out. Turned on by the `MINUTES_TEST_SELF_SOUND` environment variable, and absent from
+    /// release builds.
+    @MainActor
+    enum SelfSoundTest {
+        private static var sound: NSSound?
+
+        static func startIfRequested() {
+            guard ProcessInfo.processInfo.environment["MINUTES_TEST_SELF_SOUND"] == "1" else {
+                return
+            }
+            sound = NSSound(named: "Glass")
+            sound?.loops = true
+            sound?.play()
+        }
+    }
 
     /// Stands in for real capture in UI tests, where nothing can grant audio permissions.
     /// Turned on by the `MINUTES_FAKE_AUDIO` environment variable, and absent from release builds.

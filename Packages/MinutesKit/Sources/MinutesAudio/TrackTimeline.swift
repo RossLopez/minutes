@@ -47,6 +47,13 @@ public struct TrackTimeline: Sendable {
         return padFrames
     }
 
+    /// Silence needed to reach `frames`, so tracks that were corrected differently still match.
+    public mutating func pad(toFrames frames: Int) -> Int {
+        let padFrames = max(0, frames - writtenFrames)
+        writtenFrames += padFrames
+        return padFrames
+    }
+
     private func expectedFrames(atNanos nanos: UInt64) -> Int {
         let elapsed = Double(nanos) - Double(originNanos)
         return Int((elapsed * Double(Self.sampleRate) / 1_000_000_000).rounded())

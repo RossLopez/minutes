@@ -5,7 +5,7 @@ import MinutesAudio
 
 // Measures a recording, so "no echo" is a number. A developer tool, not part of the app.
 //
-//   minutes-audiocheck <meeting folder>
+//   minutes-audiocheck <meeting folder> [--at <start seconds> ...]
 //   minutes-audiocheck --make-signal <seconds> <output.caf>
 
 func fail(_ message: String) -> Never {
@@ -38,11 +38,13 @@ if arguments.first == "--make-signal" {
     exit(0)
 }
 
-guard arguments.count == 1 else {
-    fail("Usage: minutes-audiocheck <meeting folder>")
+guard let folderArgument = arguments.first, arguments.count == 1 || arguments[1] == "--at" else {
+    fail("Usage: minutes-audiocheck <meeting folder> [--at <start seconds> ...]")
 }
 
-let folder = URL(fileURLWithPath: arguments[0])
+let requestedStarts = arguments.dropFirst(2).compactMap { Double($0) }
+
+let folder = URL(fileURLWithPath: folderArgument)
 guard let micURL = audioFile(named: "mic-raw", in: folder),
       let systemURL = audioFile(named: "system", in: folder)
 else {
@@ -67,9 +69,10 @@ let windowFrames = Int(10 * rate)
 let usable = min(mic.samples.count, system.samples.count)
 let windows = max(1, min(5, usable / windowFrames))
 let spacing = windows > 1 ? (usable - windowFrames) / (windows - 1) : 0
+// Evenly across the recording, unless the caller asked for particular places.
+let starts = requestedStarts.isEmpty ? (0 ..< windows).map { $0 * spacing } : requestedStarts.map { Int($0 * rate) }
 print("window      lag ms  correlation  echo dB")
-for index in 0 ..< windows {
-    let start = index * spacing
+for start in starts {
     let end = min(start + windowFrames, usable)
     guard let leak = AudioAnalysis.measureLeak(
         mic: mic.samples[start ..< end],

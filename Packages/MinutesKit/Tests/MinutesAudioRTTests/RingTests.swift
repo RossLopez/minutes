@@ -38,6 +38,17 @@ private func write(_ ring: OpaquePointer, _ samples: [Float], hostTime: UInt64 =
     #expect(read(ring) == nil)
 }
 
+@Test func `each chunk carries the time offset set when it was written`() throws {
+    let ring = mrt_ring_create(1024)
+    defer { mrt_ring_destroy(ring) }
+
+    #expect(write(ring, [1]))
+    mrt_ring_set_time_offset(ring, -5000)
+    #expect(write(ring, [2]))
+    #expect(try #require(read(ring)).chunk.timeOffsetNanos == 0)
+    #expect(try #require(read(ring)).chunk.timeOffsetNanos == -5000)
+}
+
 @Test func `stride keeps only the first channel of interleaved input`() throws {
     let ring = mrt_ring_create(1024)
     defer { mrt_ring_destroy(ring) }

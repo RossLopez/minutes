@@ -84,6 +84,14 @@ func `a drifting clock stays near the timeline for hours`(clockRatio: Double) {
     #expect(timeline.padToEnd(endNanos: nanos(atFrame: 96000)) == 0)
 }
 
+@Test func `padding to a frame count only ever adds`() {
+    var timeline = TrackTimeline(originNanos: origin)
+    _ = timeline.place(startNanos: nanos(atFrame: 0), frames: 1000)
+    #expect(timeline.pad(toFrames: 1500) == 500)
+    #expect(timeline.pad(toFrames: 1200) == 0)
+    #expect(timeline.writtenFrames == 1500)
+}
+
 @Test func `padding never goes backwards`() {
     var timeline = TrackTimeline(originNanos: origin)
     _ = timeline.place(startNanos: nanos(atFrame: 0), frames: 48000)

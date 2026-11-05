@@ -20,6 +20,7 @@ struct MRTRing {
     _Atomic uint64_t dropped;
     _Atomic uint32_t peakBits;
     _Atomic uint64_t sampleRateBits;
+    _Atomic int64_t timeOffsetNanos;
 };
 
 static uint32_t round_up_power_of_two(uint32_t value) {
@@ -47,6 +48,10 @@ void mrt_ring_set_sample_rate(MRTRing *ring, double sampleRate) {
     uint64_t bits;
     memcpy(&bits, &sampleRate, sizeof(bits));
     atomic_store_explicit(&ring->sampleRateBits, bits, memory_order_relaxed);
+}
+
+void mrt_ring_set_time_offset(MRTRing *ring, int64_t nanos) {
+    atomic_store_explicit(&ring->timeOffsetNanos, nanos, memory_order_relaxed);
 }
 
 bool mrt_ring_write(MRTRing *ring, const float *samples, uint32_t stride, uint32_t frames, uint64_t hostTime) CA_REALTIME_API {
@@ -96,6 +101,7 @@ bool mrt_ring_write(MRTRing *ring, const float *samples, uint32_t stride, uint32
         .hostTime = hostTime,
         .frameCount = frames,
         .sampleRate = rate,
+        .timeOffsetNanos = atomic_load_explicit(&ring->timeOffsetNanos, memory_order_relaxed),
     };
 
     atomic_store_explicit(&ring->sampleWrite, sampleWrite + frames, memory_order_release);

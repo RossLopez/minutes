@@ -52,12 +52,14 @@ final class TrackPipeline {
         writer.sync()
     }
 
-    /// Writes what's left, pads to the end of the session and closes the file.
-    func finish(endNanos: UInt64) {
-        drain()
+    /// Pads to the end of the session, or to `minimumFrames` if the other track ran longer, and
+    /// closes the file. Drain first, so the other track's length is known.
+    func finish(endNanos: UInt64, minimumFrames: Int) {
         if writeError == nil {
             do {
-                try writer.appendSilence(frames: timeline.padToEnd(endNanos: endNanos))
+                let toEnd = timeline.padToEnd(endNanos: endNanos)
+                let toMatch = timeline.pad(toFrames: minimumFrames)
+                try writer.appendSilence(frames: toEnd + toMatch)
             } catch {
                 writeError = error
             }
@@ -72,7 +74,7 @@ final class TrackPipeline {
         }
         let positionBefore = timeline.writtenFrames
         let placement = timeline.place(
-            startNanos: HostClock.nanos(fromHostTime: chunk.hostTime),
+            startNanos: chunk.startNanos,
             frames: converted.count,
         )
         if firstAudioFrame == nil {

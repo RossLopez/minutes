@@ -47,6 +47,9 @@ public final class SystemAudioTap: AudioCaptureSource, @unchecked Sendable {
         }
         let exclude = try AudioDevices.currentProcessObject()
         let tap = TapDevice(description: CATapDescription(monoGlobalTapButExcludeProcesses: [exclude]))
+        // The tap sees audio before the output device plays it.
+        let output = AudioDevices.defaultOutputDevice()
+        ring.setTimeOffset(seconds: AudioDevices.reportedLatency(of: output, scope: kAudioObjectPropertyScopeOutput))
         try tap.start(writingTo: ring)
         device = tap
     }

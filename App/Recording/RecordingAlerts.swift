@@ -56,6 +56,19 @@ enum RecordingAlerts {
         return alert.runModal() == .alertSecondButtonReturn
     }
 
+    /// Returns whether the user wants to quit.
+    static func askToQuitAfterStalledStart() -> Bool {
+        let alert = makeAlert(
+            title: "Minutes Can't Start Recording Yet",
+            message: "Your Mac's audio system isn't responding, so nothing is being recorded. "
+                + "If you keep waiting, recording starts as soon as the audio system responds. "
+                + "If it doesn't recover, restart your Mac.",
+        )
+        alert.addButton(withTitle: "Keep Waiting")
+        alert.addButton(withTitle: "Quit Minutes")
+        return alert.runModal() == .alertSecondButtonReturn
+    }
+
     static func makeAlert(title: String, message: String) -> NSAlert {
         let alert = NSAlert()
         alert.messageText = title

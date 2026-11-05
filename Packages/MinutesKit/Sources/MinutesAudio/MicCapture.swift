@@ -99,6 +99,11 @@ public final class MicCapture: AudioCaptureSource, @unchecked Sendable {
             throw MicError.noInputChannels
         }
         ring.setSampleRate(format.sampleRate)
+        // The input's timestamps come after the sound reached the microphone.
+        ring.setTimeOffset(seconds: -AudioDevices.reportedLatency(
+            of: inputDevice(),
+            scope: kAudioObjectPropertyScopeInput,
+        ))
 
         let sink = mrt_make_sink_node(ring.raw)
         engine.attach(sink)
@@ -191,10 +196,16 @@ public final class MicCapture: AudioCaptureSource, @unchecked Sendable {
         }
     }
 
-    private func currentInputName() -> String {
-        guard let device = engine?.inputNode.withAUAudioUnit({ $0.deviceID }) else {
-            return "Unknown device"
+    /// The real microphone. The engine's own device ID can be a private aggregate it made,
+    /// with a meaningless name.
+    private func inputDevice() -> AudioObjectID {
+        if !followsDefaultInput, let uid = options.deviceUID, let device = AudioDevices.device(withUID: uid) {
+            return device
         }
-        return AudioDevices.deviceName(device)
+        return AudioDevices.defaultInputDevice()
+    }
+
+    private func currentInputName() -> String {
+        AudioDevices.deviceName(inputDevice())
     }
 }

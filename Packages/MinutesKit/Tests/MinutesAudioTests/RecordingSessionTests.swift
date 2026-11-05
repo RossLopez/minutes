@@ -61,6 +61,10 @@ private final class FakeSource: AudioCaptureSource, @unchecked Sendable {
         lock.withLock { ring }?.write(samples, hostTime: HostClock.hostTime(fromNanos: nanos))
     }
 
+    func setTimeOffset(seconds: Double) {
+        lock.withLock { ring }?.setTimeOffset(seconds: seconds)
+    }
+
     func send(_ event: CaptureEvent) {
         lock.withLock { events }?(event)
     }
@@ -139,6 +143,38 @@ private struct Harness {
     #expect(mic[9600] == 0)
     #expect(system[14399] == 0)
     #expect(system[14400] == 0.25)
+}
+
+@Test func `reported device latency moves a track on the timeline`() async throws {
+    let harness = try Harness()
+    try await harness.session.start()
+
+    // Both chunks carry the same timestamp, but the mic really heard it 50 ms earlier and the
+    // system audio is really heard 50 ms later.
+    harness.mic.setTimeOffset(seconds: -0.05)
+    harness.system.setTimeOffset(seconds: 0.05)
+    harness.mic.deliver([Float](repeating: 0.5, count: 480), atFrame: 4800)
+    harness.system.deliver([Float](repeating: 0.5, count: 480), atFrame: 4800)
+    harness.clock.advance(toFrame: 48000)
+    let summary = await harness.session.stop()
+
+    #expect(summary.mic.firstAudioSeconds == 0.05)
+    #expect(summary.system.firstAudioSeconds == 0.15)
+}
+
+@Test func `both tracks end at the same frame even if correction pushed one past the end`() async throws {
+    let harness = try Harness()
+    try await harness.session.start()
+    harness.mic.deliver([Float](repeating: 0.5, count: 4800), atFrame: 43200)
+    harness.system.setTimeOffset(seconds: 0.16)
+    harness.system.deliver([Float](repeating: 0.5, count: 4800), atFrame: 43200)
+    harness.clock.advance(toFrame: 48000)
+    let summary = await harness.session.stop()
+
+    #expect(summary.system.frames == 55680)
+    #expect(summary.mic.frames == 55680)
+    #expect(try AudioAnalysis.read(harness.micURL).samples.count == 55680)
+    #expect(try AudioAnalysis.read(harness.systemURL).samples.count == 55680)
 }
 
 @Test func `a stall in one track is recorded as a gap and the other is untouched`() async throws {

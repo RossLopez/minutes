@@ -9,8 +9,9 @@ struct MRTChunkBox {
         Int(chunk.frameCount)
     }
 
-    var hostTime: UInt64 {
-        chunk.hostTime
+    /// When the chunk's first sample was really heard or spoken, on the host clock.
+    var startNanos: UInt64 {
+        UInt64(Int64(HostClock.nanos(fromHostTime: chunk.hostTime)) + chunk.timeOffsetNanos)
     }
 
     var sampleRate: Double {

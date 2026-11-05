@@ -169,15 +169,21 @@ public final class RecordingSession: @unchecked Sendable {
     private func stopOnQueue() -> RecordingSummary {
         timer?.cancel()
         timer = nil
-        let endNanos = nowNanos()
         if micPipeline != nil {
             micSource.stop()
         }
         if systemPipeline != nil {
             systemSource.stop()
         }
-        micPipeline?.finish(endNanos: endNanos)
-        systemPipeline?.finish(endNanos: endNanos)
+        // Stopping takes time and audio arrives until it's done, so the end comes after, or the
+        // track stopped last would run longer than the other.
+        let endNanos = nowNanos()
+        micPipeline?.drain()
+        systemPipeline?.drain()
+        // Device latency correction can put one track past the end, so both go to the longer one.
+        let frames = max(micPipeline?.framesWritten ?? 0, systemPipeline?.framesWritten ?? 0)
+        micPipeline?.finish(endNanos: endNanos, minimumFrames: frames)
+        systemPipeline?.finish(endNanos: endNanos, minimumFrames: frames)
         reportWriteFailure(.mic, pipeline: micPipeline, failure: &micFailure)
         reportWriteFailure(.system, pipeline: systemPipeline, failure: &systemFailure)
 

@@ -19,6 +19,11 @@ public final class AudioRing: @unchecked Sendable {
         mrt_ring_set_sample_rate(raw, sampleRate)
     }
 
+    /// Corrects chunk timestamps by this much from now on, for the device's reported latency.
+    public func setTimeOffset(seconds: Double) {
+        mrt_ring_set_time_offset(raw, Int64(seconds * 1_000_000_000))
+    }
+
     /// Writes from a non-real-time context, for tests and fake sources.
     @discardableResult
     public func write(_ samples: [Float], hostTime: UInt64) -> Bool {

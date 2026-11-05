@@ -27,18 +27,7 @@ public enum AudioDevices {
     }
 
     public static func defaultInputName() -> String? {
-        var address = address(kAudioHardwarePropertyDefaultInputDevice)
-        var device = AudioObjectID(kAudioObjectUnknown)
-        var size = UInt32(MemoryLayout<AudioObjectID>.size)
-        let status = AudioObjectGetPropertyData(
-            AudioObjectID(kAudioObjectSystemObject),
-            &address,
-            0,
-            nil,
-            &size,
-            &device,
-        )
-        return status == noErr ? string(device, kAudioObjectPropertyName) : nil
+        string(defaultInputDevice(), kAudioObjectPropertyName)
     }
 
     public static func defaultOutputName() -> String? {
@@ -52,12 +41,55 @@ public enum AudioDevices {
         AudioObjectPropertyAddress(mSelector: selector, mScope: scope, mElement: kAudioObjectPropertyElementMain)
     }
 
+    static func defaultInputDevice() -> AudioObjectID {
+        var address = address(kAudioHardwarePropertyDefaultInputDevice)
+        var device = AudioObjectID(kAudioObjectUnknown)
+        var size = UInt32(MemoryLayout<AudioObjectID>.size)
+        AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &device)
+        return device
+    }
+
     static func defaultOutputDevice() -> AudioObjectID {
         var address = address(kAudioHardwarePropertyDefaultOutputDevice)
         var device = AudioObjectID(kAudioObjectUnknown)
         var size = UInt32(MemoryLayout<AudioObjectID>.size)
         AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &device)
         return device
+    }
+
+    /// How long sound takes between the device's IO timestamps and the air, in seconds, as the
+    /// device reports it. See docs/NOTES.md for how closely this matches a measurement.
+    static func reportedLatency(of device: AudioObjectID, scope: AudioObjectPropertyScope) -> Double {
+        var rateAddress = address(kAudioDevicePropertyNominalSampleRate)
+        var rate = Float64(0)
+        var rateSize = UInt32(MemoryLayout<Float64>.size)
+        guard AudioObjectGetPropertyData(device, &rateAddress, 0, nil, &rateSize, &rate) == noErr, rate > 0 else {
+            return 0
+        }
+        var streamsAddress = address(kAudioDevicePropertyStreams, scope: scope)
+        var size = UInt32(0)
+        AudioObjectGetPropertyDataSize(device, &streamsAddress, 0, nil, &size)
+        var streams = [AudioStreamID](repeating: 0, count: Int(size) / MemoryLayout<AudioStreamID>.size)
+        if !streams.isEmpty {
+            AudioObjectGetPropertyData(device, &streamsAddress, 0, nil, &size, &streams)
+        }
+        let stream = streams.first.map { frameValue(
+            $0,
+            kAudioStreamPropertyLatency,
+            scope: kAudioObjectPropertyScopeGlobal,
+        ) }
+        return Double(frameValue(device, kAudioDevicePropertyLatency, scope: scope) + (stream ?? 0)) / rate
+    }
+
+    private static func frameValue(
+        _ object: AudioObjectID,
+        _ selector: AudioObjectPropertySelector,
+        scope: AudioObjectPropertyScope,
+    ) -> UInt32 {
+        var address = address(selector, scope: scope)
+        var value = UInt32(0)
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        return AudioObjectGetPropertyData(object, &address, 0, nil, &size, &value) == noErr ? value : 0
     }
 
     static func deviceName(_ device: AudioObjectID) -> String {

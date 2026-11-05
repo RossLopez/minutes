@@ -22,6 +22,8 @@ typedef struct {
     uint64_t hostTime;
     uint32_t frameCount;
     double sampleRate;
+    /// Added to the host time to get when the sound was really heard or spoken.
+    int64_t timeOffsetNanos;
 } MRTChunk;
 
 /// Rounds capacityFrames up to a power of two. Call off the audio thread.
@@ -31,6 +33,9 @@ void mrt_ring_destroy(MRTRing *_Nonnull ring);
 
 /// The rate tagged onto chunks from now on. Safe from any thread.
 void mrt_ring_set_sample_rate(MRTRing *_Nonnull ring, double sampleRate);
+
+/// Sets the time offset stamped on chunks from now on. Safe to call while the ring is in use.
+void mrt_ring_set_time_offset(MRTRing *_Nonnull ring, int64_t nanos);
 
 /// Producer side. Copies the first channel of `frames` frames, reading every
 /// `stride`th sample. If the ring is full the chunk is dropped and counted, and
