@@ -49,3 +49,18 @@ targets:
           - MinutesDiarization
           - MinutesLLM
           - MinutesStorage
+    scheme:
+      testTargets:
+        - MinutesUITests
+
+  MinutesUITests:
+    type: bundle.ui-testing
+    platform: macOS
+    sources:
+      - path: AppUITests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.rosslopez.minutes.uitests
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: Minutes

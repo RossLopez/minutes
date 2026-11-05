@@ -1,8 +1,16 @@
 included:
   - App
+  - AppUITests
   - Packages/MinutesKit/Sources
   - Packages/MinutesKit/Tests
 
 line_length:
   warning: 120
   error: 160
+
+# SwiftFormat adds trailing commas and wraps the brace of a multi-line condition, so match it.
+trailing_comma:
+  mandatory_comma: true
+opening_brace:
+  ignore_multiline_statement_conditions: true
+  ignore_multiline_function_signatures: true

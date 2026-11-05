@@ -43,6 +43,15 @@ jobs:
             exit 1
           fi
 
+      - name: Require license headers in C and Objective-C files
+        run: |
+          missing=$(grep -rL 'SPDX-License-Identifier: GPL-3.0-or-later' Packages/MinutesKit/Sources/MinutesAudioRT || true)
+          if [ -n "$missing" ]; then
+            echo "Missing SPDX header:"
+            echo "$missing"
+            exit 1
+          fi
+
       - name: Unit tests
         run: swift test --package-path Packages/MinutesKit
 
@@ -60,3 +69,13 @@ jobs:
 
       - name: Verify app bundle
         run: scripts/verify-bundle.sh build/Build/Products/Release/Minutes.app
+
+      # Uses fake audio sources, because nothing can grant this runner audio permissions.
+      - name: UI test
+        run: >
+          xcodebuild test
+          -project Minutes.xcodeproj
+          -scheme Minutes
+          -destination 'platform=macOS,arch=arm64'
+          -derivedDataPath build
+          -only-testing:MinutesUITests
