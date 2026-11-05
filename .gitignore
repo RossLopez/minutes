@@ -1,0 +1,18 @@
+# macOS
+.DS_Store
+
+# Generated from project.yml
+*.xcodeproj/
+
+# Build output
+build/
+DerivedData/
+.build/
+.swiftpm/
+xcuserdata/
+
+# Local signing identity
+Config/Local.xcconfig
+
+# Local Claude Code settings
+.claude/settings.local.json

@@ -1,0 +1,12 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// Ad-hoc signing by default, so anyone can build a fork with no Apple account.
+// To sign with your own identity, copy Local.xcconfig.example to Local.xcconfig.
+// That file is gitignored. A stable signature keeps macOS permission grants
+// across rebuilds; ad-hoc builds may be asked for permissions again.
+
+CODE_SIGN_STYLE = Manual
+CODE_SIGN_IDENTITY = -
+DEVELOPMENT_TEAM =
+
+#include? "Local.xcconfig"

@@ -1,0 +1,62 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    # macOS 27 with Xcode 27. The macos-26 and macos-latest images can't run this app's minimum OS.
+    runs-on: xcode-27
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install build tools
+        run: brew install xcodegen swiftlint swiftformat
+
+      - name: Show toolchain
+        run: |
+          sw_vers
+          xcodebuild -version
+          swift --version
+
+      - name: SwiftFormat
+        run: swiftformat --lint .
+
+      - name: SwiftLint
+        run: swiftlint --strict
+
+      - name: Keep MinutesStorage free of UI frameworks
+        run: |
+          if grep -rEq '^(@preconcurrency )?import (SwiftUI|AppKit)' Packages/MinutesKit/Sources/MinutesStorage; then
+            echo "MinutesStorage must stay usable from a separate process."
+            exit 1
+          fi
+
+      - name: Unit tests
+        run: swift test --package-path Packages/MinutesKit
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build app (ad-hoc signed)
+        run: >
+          xcodebuild build
+          -project Minutes.xcodeproj
+          -scheme Minutes
+          -configuration Release
+          -destination 'platform=macOS,arch=arm64'
+          -derivedDataPath build
+
+      - name: Verify app bundle
+        run: scripts/verify-bundle.sh build/Build/Products/Release/Minutes.app

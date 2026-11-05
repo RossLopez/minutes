@@ -1,0 +1,51 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+#
+# The Xcode project is generated from this file and is not checked in.
+# Run `xcodegen generate` after cloning or after changing this file.
+
+name: Minutes
+
+options:
+  bundleIdPrefix: io.github.rosslopez
+  deploymentTarget:
+    macOS: "27.0"
+  createIntermediateGroups: true
+
+configFiles:
+  Debug: Config/Signing.xcconfig
+  Release: Config/Signing.xcconfig
+
+settings:
+  base:
+    ARCHS: arm64
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+
+packages:
+  MinutesKit:
+    path: Packages/MinutesKit
+
+targets:
+  Minutes:
+    type: application
+    platform: macOS
+    sources:
+      - path: App
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.rosslopez.minutes
+        MARKETING_VERSION: 0.0.1
+        CURRENT_PROJECT_VERSION: 1
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: App/Info.plist
+        CODE_SIGN_ENTITLEMENTS: App/Minutes.entitlements
+        ENABLE_HARDENED_RUNTIME: YES
+        ENABLE_APP_SANDBOX: NO
+    dependencies:
+      - package: MinutesKit
+        products:
+          - MinutesAudio
+          - MinutesTranscription
+          - MinutesDiarization
+          - MinutesLLM
+          - MinutesStorage

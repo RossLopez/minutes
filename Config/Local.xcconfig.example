@@ -1,0 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// Copy to Config/Local.xcconfig and fill in your Team ID.
+
+CODE_SIGN_IDENTITY = Apple Development
+DEVELOPMENT_TEAM = YOUR_TEAM_ID

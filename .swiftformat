@@ -1,0 +1,5 @@
+--swiftversion 6.4
+--indent 4
+--maxwidth 120
+--header "SPDX-License-Identifier: GPL-3.0-or-later"
+--exclude build,DerivedData,**/.build,*.xcodeproj
