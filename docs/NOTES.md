@@ -134,6 +134,10 @@ Selecting another row while a `TextField` has focus can remove the view without 
 
 A row with `.accessibilityElement(children: .combine)` appears to XCUITest as one `StaticText` whose value is all its text joined, such as `Budget Review, 8:52 AM`. Match it with `value BEGINSWITH`, not by its title as a label. XCUITest's "no matches" error can blame the parent query when it's the child that didn't match.
 
+### UI test steps are slow on CI (Nov 6, 2026)
+
+A single XCUITest step can take several seconds on a GitHub runner. One menu click took about 4 s, and 6.6 s passed between clicking Play and typing a new title, which outlasted the 6 s of audio left in a test recording. So checks that need audio still playing use a long meeting seeded before launch, rather than a recording timed to outlast the steps.
+
 ### Starting can hang (Nov 5, 2026)
 
 `AVAudioEngine.inputNode` can block with no timeout. During testing, every attempt to open an input hung for over 100 s, on the built-in mic and on a virtual device. The stack ended in `AudioDeviceCreateIOProcID`, then `HALC_ProxyIOContext::_TellServerAboutStreamUsage`, waiting on a `mach_msg` reply from the audio service. Playback and device property reads kept working, `coreaudiod` was at 0% CPU, and its logs showed nothing.
