@@ -10,6 +10,9 @@ struct MinutesApp: App {
         Window("Minutes", id: SceneID.mainWindow) {
             MainWindowView()
         }
+        .commands {
+            MeetingCommands()
+        }
 
         Settings {
             SettingsView()

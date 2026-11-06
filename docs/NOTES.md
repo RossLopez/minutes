@@ -12,6 +12,10 @@ The spec originally targeted macOS 26. Ross chose to support only macOS 27, the 
 - CI runs on the `xcode-27` image, which runs macOS 27. The `macos-26` and `macos-latest` images are still on macOS 26.
 - The Homebrew cask will use `depends_on macos: ">= :golden_gate"`.
 
+### Speaker memory is in v1 (Nov 6, 2026)
+
+Ross moved Speaker memory from the roadmap into v1. It's built at Milestone 4, because it needs diarization's voice data and that milestone's naming UI. It's opt-in, because a voice profile is biometric data about other people, and some places regulate it. Milestone 4's planning has to confirm the diarization engine exposes speaker embeddings.
+
 ### Voice processing is off by default (Nov 5, 2026)
 
 The spec asked for voice processing on, with ducking off. Apple's API has no way to do that, so Ross chose to default it to off. Speaker echo is left to the post-meeting cleanup pass in Milestone 3, which has the exact system track as its reference. Settings can turn voice processing on, with a note explaining the costs. The measurements are under "Voice processing" below.
@@ -71,9 +75,64 @@ That's a real shift of about 4.2 ms over 30 minutes. It's under the 10 ms target
 - **Choosing a specific input:** tested only on Microsoft Teams Audio, a silent virtual device. A real USB mic is still untested.
 - **Not measured:** power loss, and a real 4-hour recording. The warning is tested through its threshold logic.
 
+## Milestone 2 measurements (Nov 6, 2026)
+
+### Player sync
+
+Beeps of 1 kHz on Me and 3 kHz on Others, one each second, played through the real `TwoTrackPlayer` from a separate process and recorded by Minutes, with onsets measured on the result.
+
+| Check | Result |
+| --- | --- |
+| 1× | The tracks' beeps land 0.0 ms apart, after a first beep about 21 ms off at the very start |
+| Mute, while playing | Silences only that track, both ways round |
+| 2× with `.timeDomain` | A steady 36 to 37 ms between tracks (Others after Me), and even spacing |
+| 2× with `.spectral` | 22 to 56 ms and uneven onsets, so we use `.timeDomain` |
+| Back to 1× and seek | 0.0 ms again |
+| Seek | Beeps exactly 1.000 s apart, 0.0 ms between tracks. New audio about 0.3 to 0.4 s after the seek (an estimate, not measured precisely) |
+
+1.25×, 1.5× and 1.75× weren't measured. Sync by ear still needs a person.
+
+### List with 1,000 meetings
+
+Generated folders holding only `meeting.json`, measured with temporary timing code in `LibraryStore.refresh`. The worst gap comes from a 5 ms timer on the main thread.
+
+| Check | Result |
+| --- | --- |
+| Scan, off the main thread | 38 to 151 ms across five refreshes |
+| Worst main-thread gap, first render | 99 ms |
+| Worst main-thread gap, later refreshes | 9 to 45 ms |
+
+That's no visible stall, so the index can wait for Milestone 8. Real meetings will have more files once transcripts exist, but the scan only reads `meeting.json`.
+
+### Moving the library
+
+`LibraryMover` with its real volume check and copy verification, moved to a 300 MB APFS disk image. The original went to a scratch folder instead of the Trash.
+
+| Check | Result |
+| --- | --- |
+| Move of about 116 MB | 0.14 s, and `diff -r` found no differences |
+| Disk image too small | Refused before copying, with both sides unchanged |
+| Record in the new place | Saved there with both tracks (fake audio) |
+| Unmount, then activate | List offers Locate and Use Default, and Record refuses. No folder appeared at the old path |
+| Mount again, then activate | The list comes back by itself |
+
+The file panel behind **Move…** and **Locate…** runs in another process, so no automated check here has chosen a folder through it.
+
 ## Apple API notes
 
 Measurements are from a MacBook Pro on macOS 27.0.1 with a quiet test tone played by `afplay`, unless a note says otherwise.
+
+### `.searchable` adds no ⌘F (Nov 6, 2026)
+
+A `.searchable` field in a `NavigationSplitView` sidebar gets no Find command in the Edit menu and doesn't respond to ⌘F. We add the command ourselves and focus the field through `searchFocused`.
+
+### A focused field removed by selection gets no focus change first (Nov 6, 2026)
+
+Selecting another row while a `TextField` has focus can remove the view without a useful order of events: its `onChange(of: focus)` and `onDisappear` may both run, sometimes after a rename from the first has already moved the folder. Anything saved from both must tolerate running twice, so `LibraryStore.rename` ignores a folder that has gone. Editing state also has to be cleared in `onDisappear`.
+
+### Combined rows in UI tests (Nov 6, 2026)
+
+A row with `.accessibilityElement(children: .combine)` appears to XCUITest as one `StaticText` whose value is all its text joined, such as `Budget Review, 8:52 AM`. Match it with `value BEGINSWITH`, not by its title as a label. XCUITest's "no matches" error can blame the parent query when it's the child that didn't match.
 
 ### Starting can hang (Nov 5, 2026)
 

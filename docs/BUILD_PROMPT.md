@@ -90,6 +90,7 @@ Nothing is transcribed during the meeting. When the user stops recording, a proc
 - Diarize the system track on-device (FluidAudio's diarization or equivalent CoreML pipeline; no Python at runtime). Label results Speaker 1, Speaker 2, and so on.
 - Merge both tracks into one transcript ordered by time, with overlap handled cleanly.
 - **Naming:** in the transcript, clicking a speaker label opens a field to type a name. The name applies to every segment from that speaker, updates the summary's action-item owners, and is saved in `meeting.json`. Offer previously used names as suggestions. Allow merging two speakers (diarization split one person) and reassigning a single segment.
+- **Speaker memory (opt-in):** with a Settings switch on, naming a speaker saves a voice profile, so later meetings name that person automatically. Uncertain matches appear as suggestions instead of being applied, and any name can be corrected. Settings lists saved profiles and can delete them. A voice profile is biometric data about other people, so it's off until turned on, stays on the Mac, and gets a line in the consent note. Choosing a diarization engine must confirm it exposes speaker embeddings.
 - Clicking any transcript line plays the audio from that moment.
 
 ## 5. Local AI
@@ -151,6 +152,7 @@ All user data lives in `~/Minutes/`, not Application Support. This works because
       notes-cleaned.md    # AI cleanup, if accepted
       summary.md          # latest summary (older versions in summaries/)
   Templates/              # summary templates (.md)
+  Speakers/               # saved voice profiles, one file per person (opt-in)
   Vocabulary.txt          # custom vocabulary, editable by hand
   Models/                 # GGUF + ASR + diarization models, excluded from Time Machine
   .minutes/
@@ -191,7 +193,7 @@ Welcome → your name (used for "Me") → permissions → model download (Gemma 
 | --- | --- |
 | General | Your name, launch at login, menu bar icon, global shortcut, update checks on/off |
 | Recording | Input device, voice processing on/off, audio format (AAC / ALAC), long-recording warning |
-| Transcription | Engine and model, **Custom vocabulary** editor with import/export |
+| Transcription | Engine and model, **Custom vocabulary** editor with import/export, **Speaker memory** switch and saved profiles |
 | AI Models | Built-in model manager (download, delete, set default, disk used), OpenAI-compatible endpoints, which model each feature uses |
 | Summary Templates | Edit default, add/duplicate/delete templates |
 | Permissions | See below |
@@ -232,7 +234,7 @@ Build in this order. Each milestone ends with a working app, passing tests, and 
 1. **Permissions + capture:** Permissions tab working; record mic and system audio to separate files with level meters; crash recovery; device switching. Verify no echo of system audio in the mic file with headphones, and document results with speakers.
 2. **Library + playback:** `~/Minutes/` layout, meeting list, detail view, two-track player, rename, delete to Trash, Reveal in Finder.
 3. **Transcription:** engine spike and report (section 4), then the post-meeting pipeline with progress, custom vocabulary, and click-to-play transcript.
-4. **Speakers:** diarization, merged transcript, naming, merging and reassigning speakers.
+4. **Speakers:** diarization, merged transcript, naming, merging and reassigning speakers, speaker memory.
 5. **Built-in AI:** model download manager, llama.cpp runtime, summaries with the default template and custom templates.
 6. **OpenAI-compatible endpoints:** add/test/select endpoints, per-feature model choice.
 7. **Notes:** live notes pane during recording, AI cleanup with diff.
@@ -253,6 +255,5 @@ Build in this order. Each milestone ends with a working app, passing tests, and 
 
 - **MCP server:** a local MCP server (stdio helper binary bundled in the app, e.g. `minutes-mcp`) so Claude and other MCP clients can list meetings, read transcripts, summaries and notes, and search, read-only by default, with an on/off switch and per-capability toggles in Settings. Keep the storage and search layer usable from a separate process so this is easy to add.
 - **Calendar awareness:** read EventKit to suggest meeting titles and attendees as speaker names. Still no meeting bots.
-- **Speaker memory:** optionally remember voice profiles so returning speakers are named automatically.
 - **More exports:** PDF, SRT/VTT, DOCX.
 - **Other languages:** last on the list, only if there's demand.

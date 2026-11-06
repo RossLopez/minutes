@@ -18,7 +18,9 @@ struct SettingsView: View {
                         PermissionsSettingsTab()
                     case .about:
                         AboutSettingsTab()
-                    case .transcription, .aiModels, .summaryTemplates, .storage:
+                    case .storage:
+                        StorageSettingsTab()
+                    case .transcription, .aiModels, .summaryTemplates:
                         ContentUnavailableView(
                             tab.title,
                             systemImage: tab.systemImage,
@@ -79,8 +81,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .transcription: "Arrives in Milestone 3."
         case .aiModels: "Arrives in Milestones 5 and 6."
         case .summaryTemplates: "Arrives in Milestone 5."
-        case .storage: "Arrives in Milestone 2."
-        case .general, .recording, .permissions, .about: ""
+        case .general, .recording, .permissions, .storage, .about: ""
         }
     }
 }

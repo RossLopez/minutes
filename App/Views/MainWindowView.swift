@@ -3,25 +3,76 @@
 import SwiftUI
 
 struct MainWindowView: View {
-    @State private var selection: SidebarItem? = .allMeetings
     @AppStorage(RecordingPreferences.consentNoteShownKey) private var consentNoteShown = false
+    @FocusState private var isSearchFocused: Bool
     private let controller = RecordingController.shared
+    private let store = LibraryStore.shared
+
+    private var sidebarSelection: Binding<SidebarItem?> {
+        Binding(get: { store.sidebarItem }, set: { store.sidebarItem = $0 ?? .allMeetings })
+    }
+
+    private var isPlayerShowing: Bool {
+        store.sidebarItem == .allMeetings && store.player.loadedFolder != nil
+    }
 
     var body: some View {
         NavigationSplitView {
-            List(SidebarItem.allCases, selection: $selection) { item in
-                Label(item.title, systemImage: item.systemImage)
+            List(selection: sidebarSelection) {
+                ForEach(SidebarItem.allCases) { item in
+                    Label(item.title, systemImage: item.systemImage)
+                        .tag(item)
+                }
+                Section {
+                    Button {
+                        store.openTrash()
+                    } label: {
+                        Label("Recently Deleted", systemImage: "trash")
+                    }
+                    .buttonStyle(.plain)
+                    .help("Open the Trash in Finder")
+                    .accessibilityIdentifier("recentlyDeleted")
+                }
             }
             .navigationSplitViewColumnWidth(min: 180, ideal: 200)
         } content: {
-            ContentUnavailableView(
-                selection?.emptyTitle ?? SidebarItem.allMeetings.emptyTitle,
-                systemImage: selection?.systemImage ?? SidebarItem.allMeetings.systemImage,
-                description: Text(selection?.emptyDescription ?? SidebarItem.allMeetings.emptyDescription),
-            )
+            Group {
+                switch store.sidebarItem {
+                case .allMeetings:
+                    MeetingListView(store: store)
+                case .chat:
+                    ContentUnavailableView(
+                        "No Chats",
+                        systemImage: SidebarItem.chat.systemImage,
+                        description: Text("Chat about your past meetings arrives in Milestone 8."),
+                    )
+                }
+            }
             .navigationSplitViewColumnWidth(min: 260, ideal: 300)
         } detail: {
-            ContentUnavailableView("No Meeting Selected", systemImage: "doc.text")
+            if store.sidebarItem == .allMeetings, let entry = store.selectedEntry {
+                MeetingDetailView(store: store, entry: entry)
+                    .id(entry.id)
+            } else {
+                ContentUnavailableView("No Meeting Selected", systemImage: "doc.text")
+            }
+        }
+        .searchable(
+            text: Binding(get: { store.searchText }, set: { store.searchText = $0 }),
+            placement: .sidebar,
+            prompt: "Search Titles",
+        )
+        .searchFocused($isSearchFocused)
+        .onChange(of: isSearchFocused) {
+            store.isEditingSearch = isSearchFocused
+        }
+        .onChange(of: store.searchRequests) {
+            isSearchFocused = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            Task {
+                await store.refresh()
+            }
         }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -39,6 +90,8 @@ struct MainWindowView: View {
                 }
             }
             .padding(16)
+            // Keeps the recording status above the player.
+            .padding(.bottom, isPlayerShowing ? 104 : 0)
         }
         .alert("Recording Consent", isPresented: .constant(!consentNoteShown)) {
             Button("OK") {
@@ -69,43 +122,6 @@ private struct RecordToolbarButton: View {
             .buttonStyle(.borderedProminent)
             .disabled(!controller.canToggle)
             .accessibilityIdentifier("toolbarRecord")
-        }
-    }
-}
-
-private enum SidebarItem: String, CaseIterable, Identifiable {
-    case allMeetings
-    case chat
-
-    var id: Self {
-        self
-    }
-
-    var title: String {
-        switch self {
-        case .allMeetings: "All Meetings"
-        case .chat: "Chat"
-        }
-    }
-
-    var systemImage: String {
-        switch self {
-        case .allMeetings: "waveform"
-        case .chat: "bubble.left.and.bubble.right"
-        }
-    }
-
-    var emptyTitle: String {
-        switch self {
-        case .allMeetings: "No Meetings"
-        case .chat: "No Chats"
-        }
-    }
-
-    var emptyDescription: String {
-        switch self {
-        case .allMeetings: "Meetings you record will appear here."
-        case .chat: "Chat about your past meetings arrives in Milestone 8."
         }
     }
 }

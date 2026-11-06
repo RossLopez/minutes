@@ -15,17 +15,21 @@ enum MeetingRecovery {
     /// Returns the folder of the last meeting it finished, if any.
     static func run(library: MinutesLibrary) async -> URL? {
         var lastFinished: URL?
-        for (folder, metadata) in library.unfinishedMeetings() {
-            let finished = switch metadata.state {
-            case .encoding: await resumeEncoding(folder: folder, metadata: metadata)
-            case .recording: await offerRecovery(folder: folder, metadata: metadata)
-            case .complete: false
-            }
-            if finished {
-                lastFinished = folder.url
-            }
+        for (folder, metadata) in library.unfinishedMeetings()
+            where await handle(folder: folder, metadata: metadata)
+        {
+            lastFinished = folder.url
         }
         return lastFinished
+    }
+
+    /// Finishes one meeting, asking first if it was cut off. Returns whether it's now complete.
+    static func handle(folder: MeetingFolder, metadata: MeetingMetadata) async -> Bool {
+        switch metadata.state {
+        case .encoding: await resumeEncoding(folder: folder, metadata: metadata)
+        case .recording: await offerRecovery(folder: folder, metadata: metadata)
+        case .complete: false
+        }
     }
 
     private static func resumeEncoding(folder: MeetingFolder, metadata: MeetingMetadata) async -> Bool {
@@ -61,7 +65,11 @@ enum MeetingRecovery {
             return await recover(folder: folder, metadata: metadata, seconds: seconds)
         }
         if response == (hasAudio ? .alertSecondButtonReturn : .alertFirstButtonReturn) {
-            moveToTrash(folder)
+            await LibraryStore.shared.moveToTrash(MeetingEntry(
+                folder: folder,
+                metadata: metadata,
+                date: metadata.startedAt,
+            ))
         }
         return false
     }
@@ -81,14 +89,6 @@ enum MeetingRecovery {
                 message: "The audio is still in the meeting's folder, and Minutes will try again next launch.",
             )
             return false
-        }
-    }
-
-    private static func moveToTrash(_ folder: MeetingFolder) {
-        do {
-            try FileManager.default.trashItem(at: folder.url, resultingItemURL: nil)
-        } catch {
-            logger.error("Moving to Trash failed: \(String(describing: error), privacy: .public)")
         }
     }
 }

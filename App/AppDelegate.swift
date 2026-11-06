@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         GlobalHotKey.shared.register(HotKeyShortcut.load())
 
         Task {
+            await LibraryStore.shared.refresh()
             await RecordingController.shared.recoverUnfinishedMeetings()
         }
     }
