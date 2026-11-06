@@ -4,6 +4,8 @@ import SwiftUI
 
 struct MainWindowView: View {
     @State private var selection: SidebarItem? = .allMeetings
+    @AppStorage(RecordingPreferences.consentNoteShownKey) private var consentNoteShown = false
+    private let controller = RecordingController.shared
 
     var body: some View {
         NavigationSplitView {
@@ -23,14 +25,51 @@ struct MainWindowView: View {
         }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button {} label: {
-                    Label("Record", systemImage: "record.circle")
-                }
-                .disabled(true)
-                .help("Recording arrives in Milestone 1")
+                RecordToolbarButton(controller: controller)
             }
         }
+        .overlay(alignment: .bottom) {
+            Group {
+                if controller.isRecording {
+                    RecordingHUD(controller: controller)
+                } else if controller.phase == .saving || controller.lastSavedFolder != nil || !controller.notices
+                    .isEmpty
+                {
+                    RecordingStatusBanner(controller: controller)
+                }
+            }
+            .padding(16)
+        }
+        .alert("Recording Consent", isPresented: .constant(!consentNoteShown)) {
+            Button("OK") {
+                consentNoteShown = true
+            }
+        } message: {
+            Text("Some places require everyone's consent to record a conversation. Getting it is up to you.")
+        }
         .frame(minWidth: 800, minHeight: 500)
+    }
+}
+
+private struct RecordToolbarButton: View {
+    let controller: RecordingController
+
+    var body: some View {
+        if controller.isRecording {
+            Button("Stop", systemImage: "stop.fill") {
+                controller.stopRecording()
+            }
+            .tint(.red)
+            .accessibilityIdentifier("toolbarStop")
+        } else {
+            Button("Record", systemImage: "record.circle") {
+                controller.startRecording()
+            }
+            .tint(.red)
+            .buttonStyle(.borderedProminent)
+            .disabled(!controller.canToggle)
+            .accessibilityIdentifier("toolbarRecord")
+        }
     }
 }
 

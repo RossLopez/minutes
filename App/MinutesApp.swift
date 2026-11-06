@@ -18,9 +18,7 @@ struct MinutesApp: App {
         MenuBarExtra {
             MenuBarContent()
         } label: {
-            // Without this label VoiceOver reads the symbol's name, "Audio Waveform".
-            Image(systemName: "waveform")
-                .accessibilityLabel("Minutes")
+            MenuBarLabel()
         }
     }
 }

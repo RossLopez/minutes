@@ -52,13 +52,13 @@ Record two separate tracks for every meeting: **mic** (the local user) and **sys
 
 - Capture with `AVAudioEngine` on the user's chosen input device (default: system default input, follows changes).
 - **Echo control, in two layers:**
-  1. Live: enable Apple's voice processing on the input node for echo cancellation, with other-audio ducking turned off so the meeting audio volume isn't lowered.
+  1. Live (optional, off by default): Apple's voice processing on the input node for echo cancellation, at minimum ducking. It can't be made duck-free, so it lowers meeting audio while on (measured in `docs/NOTES.md`).
   2. After the meeting: because Minutes has the exact system-audio signal, run a reference-based echo/bleed suppression pass on the mic track using the system track as the reference. Keep the raw mic file too; transcription uses the cleaned one.
-- Add a Settings toggle to turn voice processing off (some pro mics and headsets do better without it), and a one-line hint in the recording UI that headphones give the cleanest result.
+- Add a Settings toggle to turn voice processing on (useful on speakers, at the cost of quieter meeting audio and no input device choice), and a one-line hint in the recording UI that headphones give the cleanest result.
 
 ### Files and reliability
 
-- Write both tracks as 48 kHz mono in a crash-safe format while recording (CAF, flushed often). On stop, encode to the user's chosen format: AAC (`.m4a`, default) or ALAC lossless. Keep sample-accurate alignment between tracks; store the start offset in `meeting.json`.
+- Write both tracks as 48 kHz mono in a crash-safe format while recording (CAF, flushed often). On stop, encode to the user's chosen format: AAC (`.m4a`, default) or ALAC lossless. Keep both tracks on one timeline from host timestamps, within 10 ms and with no build-up over time (the mic and output device run on separate clocks, so sample-exact alignment isn't possible); store the start offset in `meeting.json`.
 - If the app or Mac crashes mid-recording, offer to recover the partial recording on next launch.
 - Prevent idle sleep while recording. Show a live level meter for each track so the user can see both are working.
 - Stop is manual only (button, menu bar, global shortcut). Warn if a recording runs past a configurable limit (default 4 hours) or disk space drops below 2 GB.
@@ -203,7 +203,7 @@ Welcome → your name (used for "Me") → permissions → model download (Gemma 
 One row per permission with an icon, a one-sentence reason, a live status badge (**Granted**, **Not requested**, **Denied**, or **Unknown** when it can't be determined), and a button that either requests it or opens the right System Settings pane.
 
 - **Microphone:** status from `AVCaptureDevice.authorizationStatus(for: .audio)`; request with `requestAccess`.
-- **System Audio Recording:** macOS has no public API to read this status directly. Determine it by creating a short-lived test tap and checking whether real audio frames arrive (play a silent probe if needed); show **Unknown** rather than guessing. Deep-link to Privacy & Security → Screen & System Audio Recording; verify the current URL scheme against macOS 27.
+- **System Audio Recording:** macOS has no public API to read this status directly. Determine it by creating a short-lived tap of Minutes' own process and playing a very quiet non-zero signal, since denied taps deliver zeros and true silence would look the same; show **Unknown** rather than guessing. Deep-link to Privacy & Security → Screen & System Audio Recording; verify the current URL scheme against macOS 27.
 - **Notifications:** for "processing finished" alerts.
 - Re-check statuses when the app becomes active. If a required permission is missing when the user hits Record, explain and link here instead of failing silently.
 

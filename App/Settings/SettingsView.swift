@@ -3,13 +3,22 @@
 import SwiftUI
 
 struct SettingsView: View {
+    @AppStorage(SettingsTab.storageKey) private var selection = SettingsTab.general
+
     var body: some View {
-        TabView {
+        TabView(selection: $selection) {
             ForEach(SettingsTab.allCases) { tab in
-                Tab(tab.title, systemImage: tab.systemImage) {
-                    if tab == .about {
+                Tab(tab.title, systemImage: tab.systemImage, value: tab) {
+                    switch tab {
+                    case .general:
+                        GeneralSettingsTab()
+                    case .recording:
+                        RecordingSettingsTab()
+                    case .permissions:
+                        PermissionsSettingsTab()
+                    case .about:
                         AboutSettingsTab()
-                    } else {
+                    case .transcription, .aiModels, .summaryTemplates, .storage:
                         ContentUnavailableView(
                             tab.title,
                             systemImage: tab.systemImage,
@@ -23,7 +32,9 @@ struct SettingsView: View {
     }
 }
 
-private enum SettingsTab: String, CaseIterable, Identifiable {
+enum SettingsTab: String, CaseIterable, Identifiable {
+    static let storageKey = "settings.selectedTab"
+
     case general
     case recording
     case transcription
@@ -65,13 +76,11 @@ private enum SettingsTab: String, CaseIterable, Identifiable {
 
     var stubDescription: String {
         switch self {
-        case .general: "Arrives across Milestones 1, 4 and 9."
-        case .recording, .permissions: "Arrives in Milestone 1."
         case .transcription: "Arrives in Milestone 3."
         case .aiModels: "Arrives in Milestones 5 and 6."
         case .summaryTemplates: "Arrives in Milestone 5."
         case .storage: "Arrives in Milestone 2."
-        case .about: ""
+        case .general, .recording, .permissions, .about: ""
         }
     }
 }

@@ -16,12 +16,13 @@ A free, open source, native macOS meeting recorder for Apple Silicon. The full s
 - Use plan mode before each milestone and show the plan. Stop and check in after each milestone with a short demo note.
 - Ask before adding any dependency. State its license and why it's needed. Every dependency must be GPL v3 compatible.
 - Keep audio, transcription, diarization, LLM and storage in separate modules with protocols at the boundaries, so engines can be swapped and tested with fakes. `MinutesStorage` must not import SwiftUI or AppKit, so a separate process can use it later.
+- Code that runs on a real-time audio thread goes in the `MinutesAudioRT` C/Objective-C target: no Swift, allocation or locks there. Everything else is Swift.
 - Unit-test the pipeline, storage and merging logic with short fixture audio files in the repo. UI-test the record → stop → transcript flow.
 - Never log transcript or note content. Logs hold timings, errors and IDs only.
 - macOS 27 APIs are newer than much of your training data. Check SDK headers or Apple's current docs before using any audio, Speech or Liquid Glass API. Never invent API names.
 - When an Apple API behaves differently than documented, write it down in `docs/NOTES.md` with the workaround.
 - If part of the spec turns out to be impractical, say so and propose an alternative. Don't quietly cut it.
-- Every source file starts with `// SPDX-License-Identifier: GPL-3.0-or-later`.
+- Every source file, including C and Objective-C, starts with `// SPDX-License-Identifier: GPL-3.0-or-later`.
 
 ## Platform
 
@@ -44,11 +45,17 @@ swift test --package-path Packages/MinutesKit
 ```
 
 ```bash
+xcodebuild test -project Minutes.xcodeproj -scheme Minutes -destination 'platform=macOS,arch=arm64' -derivedDataPath build -only-testing:MinutesUITests
+```
+
+```bash
 swiftformat --lint . && swiftlint --strict
 ```
 
 ```bash
 scripts/verify-bundle.sh build/Build/Products/Debug/Minutes.app
 ```
+
+`swift run --package-path Packages/MinutesKit minutes-audiocheck <meeting folder>` measures a recording: lengths, levels, track offset and how much system audio leaked into the mic.
 
 Builds are ad-hoc signed unless `Config/Local.xcconfig` exists. See `Config/Local.xcconfig.example`.
