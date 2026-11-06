@@ -33,6 +33,16 @@ public struct MeetingFolder: Equatable, Sendable {
         audioFolder.appendingPathComponent("system.m4a")
     }
 
+    /// The echo-cleaned mic track, once Milestone 3's pipeline has made one.
+    public var cleanedMicAudio: URL {
+        audioFolder.appendingPathComponent("mic.m4a")
+    }
+
+    /// The mic track to listen to: the cleaned one if it exists, otherwise the original.
+    public var playbackMicAudio: URL {
+        FileManager.default.fileExists(atPath: cleanedMicAudio.path) ? cleanedMicAudio : micAudio
+    }
+
     public func loadMetadata() throws -> MeetingMetadata {
         try MeetingMetadata.decoder.decode(MeetingMetadata.self, from: Data(contentsOf: metadataURL))
     }

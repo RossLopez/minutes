@@ -35,7 +35,9 @@ public struct MeetingMetadata: Codable, Equatable, Sendable {
         }
     }
 
-    public var schemaVersion = 1
+    public static let currentSchemaVersion = 1
+
+    public var schemaVersion = MeetingMetadata.currentSchemaVersion
     public var id: UUID
     public var title: String
     public var startedAt: Date
@@ -70,6 +72,11 @@ public struct MeetingMetadata: Codable, Equatable, Sendable {
         self.outputDeviceName = outputDeviceName
         mic = Track()
         system = Track()
+    }
+
+    /// Saving a file like this would drop fields this version doesn't know, so it's read-only.
+    public var isNewerThanThisApp: Bool {
+        schemaVersion > Self.currentSchemaVersion
     }
 
     static let encoder: JSONEncoder = {

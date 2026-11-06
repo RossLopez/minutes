@@ -32,10 +32,11 @@ final class RecordingController {
     private(set) var systemLevel: Float = 0
     private(set) var notices = RecordingNotices()
     private(set) var lastSavedFolder: URL?
+    /// The meeting being recorded or saved, which nothing else may change.
+    private(set) var activeFolder: URL?
     /// Goes up when something outside a view needs the Settings window. See `MenuBarLabel`.
     private(set) var settingsRequests = 0
 
-    @ObservationIgnored private let library: MinutesLibrary
     @ObservationIgnored private let useFakeAudio: Bool
     @ObservationIgnored private var meeting: ActiveMeeting?
     @ObservationIgnored private var meterTask: Task<Void, Never>?
@@ -46,12 +47,8 @@ final class RecordingController {
 
     private init() {
         #if DEBUG
-            let environment = ProcessInfo.processInfo.environment
-            library = environment["MINUTES_TEST_ROOT"].map { MinutesLibrary(root: URL(fileURLWithPath: $0)) }
-                ?? MinutesLibrary()
-            useFakeAudio = environment["MINUTES_FAKE_AUDIO"] == "1"
+            useFakeAudio = ProcessInfo.processInfo.environment["MINUTES_FAKE_AUDIO"] == "1"
         #else
-            library = MinutesLibrary()
             useFakeAudio = false
         #endif
     }
@@ -61,7 +58,7 @@ final class RecordingController {
     }
 
     var canToggle: Bool {
-        phase == .idle || phase == .recording
+        (phase == .idle && !LibraryStore.shared.isMovingLibrary) || phase == .recording
     }
 
     func toggle() {
@@ -76,9 +73,10 @@ final class RecordingController {
     }
 
     func startRecording() {
-        guard phase == .idle else {
+        guard phase == .idle, !LibraryStore.shared.isMovingLibrary else {
             return
         }
+        LibraryStore.shared.player.pause()
         phase = .starting
         notices = RecordingNotices()
         lastSavedFolder = nil
@@ -117,6 +115,11 @@ final class RecordingController {
     // MARK: - Starting
 
     private func start() async {
+        guard await LibraryStore.shared.ensureLibraryIsAvailable() else {
+            phase = .idle
+            return
+        }
+
         if !useFakeAudio {
             guard await ensurePermissions() else {
                 phase = .idle
@@ -152,7 +155,7 @@ final class RecordingController {
                 self?.handle(event, on: track)
             }
         }
-        return try await ActiveMeeting(library: library, useFakeAudio: useFakeAudio, events: events)
+        return try await ActiveMeeting(library: LibraryStore.shared.library, useFakeAudio: useFakeAudio, events: events)
     }
 
     /// Opening an input can block for as long as the Mac's audio service doesn't answer, and it
@@ -178,6 +181,10 @@ final class RecordingController {
         tickCount = 0
         freeBytes = availableBytes()
         phase = .recording
+        activeFolder = meeting?.folder.url
+        Task {
+            await LibraryStore.shared.refresh()
+        }
         meterTask = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: Self.meterInterval)
@@ -264,6 +271,7 @@ final class RecordingController {
         micLevel = 0
         systemLevel = 0
         await meeting?.finishCapture()
+        await LibraryStore.shared.refresh()
     }
 
     private func encodeFinishedMeeting() async {
@@ -277,7 +285,10 @@ final class RecordingController {
                 notices.add(.encodingFailed)
             }
         }
+        let finished = meeting?.folder.url
         meeting = nil
+        activeFolder = nil
+        await LibraryStore.shared.refresh(selecting: finished)
         if let activity {
             ProcessInfo.processInfo.endActivity(activity)
         }
@@ -316,9 +327,37 @@ extension RecordingController {
             return
         }
         phase = .saving
-        if let recovered = await MeetingRecovery.run(library: library) {
+        if let recovered = await MeetingRecovery.run(library: LibraryStore.shared.library) {
             lastSavedFolder = recovered
         }
         phase = .idle
+        await LibraryStore.shared.refresh()
+    }
+
+    /// For a meeting left unfinished after someone chose Later.
+    func recover(_ entry: MeetingEntry) async {
+        guard phase == .idle, let metadata = entry.metadata else {
+            return
+        }
+        phase = .saving
+        if await MeetingRecovery.handle(folder: entry.folder, metadata: metadata) {
+            lastSavedFolder = entry.id
+        }
+        phase = .idle
+        await LibraryStore.shared.refresh()
+    }
+
+    // MARK: - Library changes
+
+    func folderMoved(from old: URL, to new: URL) {
+        if lastSavedFolder == old {
+            lastSavedFolder = new
+        }
+    }
+
+    func folderGone(_ folder: URL) {
+        if lastSavedFolder == folder {
+            lastSavedFolder = nil
+        }
     }
 }

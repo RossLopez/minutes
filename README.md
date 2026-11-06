@@ -2,7 +2,7 @@
 
 A free, open source, native macOS meeting recorder for Apple Silicon. Minutes records system audio and your microphone on separate tracks, then transcribes and summarizes the meeting on your Mac. Nothing leaves your Mac, there are no accounts, and it never joins your meetings as a bot.
 
-**Status:** early development. It records your microphone and system audio to separate files, and recovers a recording after a crash. Transcription and summaries come in later milestones.
+**Status:** early development. It records your microphone and system audio to separate files, recovers a recording after a crash, and lets you browse, play back, rename and trash your meetings. Transcription and summaries come in later milestones.
 
 ## Requirements
 
