@@ -20,7 +20,9 @@ struct SettingsView: View {
                         AboutSettingsTab()
                     case .storage:
                         StorageSettingsTab()
-                    case .transcription, .aiModels, .summaryTemplates:
+                    case .transcription:
+                        TranscriptionSettingsTab()
+                    case .aiModels, .summaryTemplates:
                         ContentUnavailableView(
                             tab.title,
                             systemImage: tab.systemImage,
@@ -78,10 +80,9 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 
     var stubDescription: String {
         switch self {
-        case .transcription: "Arrives in Milestone 3."
         case .aiModels: "Arrives in Milestones 5 and 6."
         case .summaryTemplates: "Arrives in Milestone 5."
-        case .general, .recording, .permissions, .storage, .about: ""
+        case .general, .recording, .transcription, .permissions, .storage, .about: ""
         }
     }
 }

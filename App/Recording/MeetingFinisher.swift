@@ -24,6 +24,8 @@ enum MeetingFinisher {
         }
         var finished = metadata
         finished.state = .complete
+        // In place before anything else, so a crash right after this still gets transcribed at next launch.
+        finished.processing = ProcessingState()
         try folder.save(finished)
     }
 

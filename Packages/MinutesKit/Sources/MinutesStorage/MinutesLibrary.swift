@@ -39,6 +39,22 @@ public struct MinutesLibrary: Sendable {
         root.appendingPathComponent(".minutes", isDirectory: true)
     }
 
+    public var vocabularyFile: URL {
+        root.appendingPathComponent("Vocabulary.txt")
+    }
+
+    /// An empty list if there's no file yet. Throws if the file exists but isn't text, so nothing overwrites it.
+    public func loadVocabulary() throws -> [VocabularyEntry] {
+        guard FileManager.default.fileExists(atPath: vocabularyFile.path) else {
+            return []
+        }
+        return try Vocabulary.parse(String(contentsOf: vocabularyFile, encoding: .utf8))
+    }
+
+    public func saveVocabulary(_ entries: [VocabularyEntry]) throws {
+        try Data(Vocabulary.render(entries).utf8).write(to: vocabularyFile, options: .atomic)
+    }
+
     /// Creates the library's folders. Safe to call every launch.
     public func prepareLayout() throws {
         let logs = internalFolder.appendingPathComponent("logs", isDirectory: true)
@@ -115,6 +131,12 @@ public struct MinutesLibrary: Sendable {
         guard !title.isEmpty else {
             throw LibraryError.emptyTitle
         }
+        return try MeetingFolder.metadataLock.withLock {
+            try renameLocked(folder, to: title)
+        }
+    }
+
+    private func renameLocked(_ folder: MeetingFolder, to title: String) throws -> MeetingFolder {
         guard var metadata = try? folder.loadMetadata() else {
             throw LibraryError.unreadableMetadata
         }
@@ -136,7 +158,12 @@ public struct MinutesLibrary: Sendable {
             try? folder.save(metadata)
             throw error
         }
-        return MeetingFolder(url: destination)
+        let renamed = MeetingFolder(url: destination)
+        // The readable transcript starts with the title. If this fails, the transcript itself is still right.
+        if let transcript = try? renamed.loadTranscript() {
+            try? renamed.save(transcript, title: title, startedAt: metadata.startedAt)
+        }
+        return renamed
     }
 
     /// Moves a meeting's folder to the Trash. Returns where it landed, if the system says.

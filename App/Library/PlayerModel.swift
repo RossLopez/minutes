@@ -86,6 +86,11 @@ final class PlayerModel {
         player?.seek(to: seconds)
     }
 
+    func play(from seconds: Double) {
+        player?.seek(to: seconds)
+        player?.play()
+    }
+
     func setSpeed(_ newSpeed: Float) {
         speed = newSpeed
         UserDefaults.standard.set(newSpeed, forKey: Self.speedKey)

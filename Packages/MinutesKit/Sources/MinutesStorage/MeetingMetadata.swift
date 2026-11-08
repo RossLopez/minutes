@@ -51,6 +51,8 @@ public struct MeetingMetadata: Codable, Equatable, Sendable {
     public var outputDeviceName: String?
     public var mic: Track
     public var system: Track
+    /// What's happened since Stop. `nil` for meetings recorded before there was anything to do.
+    public var processing: ProcessingState?
 
     public init(
         id: UUID = UUID(),

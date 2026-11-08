@@ -41,6 +41,13 @@ check "minimum macOS" "27.0" "$(plist_value LSMinimumSystemVersion)"
 check_present "NSMicrophoneUsageDescription" "$(plist_value NSMicrophoneUsageDescription)"
 check_present "NSAudioCaptureUsageDescription" "$(plist_value NSAudioCaptureUsageDescription)"
 
+if [[ -f "$app/Contents/Resources/THIRD_PARTY_NOTICES.md" ]]; then
+    echo "ok    third-party notices: present"
+else
+    echo "FAIL  third-party notices: missing"
+    failures=$((failures + 1))
+fi
+
 signature="$(codesign -dv "$app" 2>&1)"
 if grep -Eq 'flags=.*runtime' <<<"$signature"; then
     echo "ok    hardened runtime: on"

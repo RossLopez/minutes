@@ -73,6 +73,10 @@ private struct MeetingRow: View {
                 Text(badge)
                     .font(.caption)
                     .foregroundStyle(state == .recording ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
+            } else if let badge = TranscriptionCenter.shared.badge(for: entry) {
+                Text(badge)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
         }
         .padding(.vertical, 2)
@@ -136,6 +140,14 @@ struct MeetingActions: View {
 
         Button("Reveal in Finder") {
             store.reveal(entry)
+        }
+
+        if MeetingDisplayState(entry: entry) == .ready,
+           let title = TranscriptionCenter.shared.transcribeTitle(for: entry)
+        {
+            Button(title) {
+                TranscriptionCenter.shared.transcribe(entry)
+            }
         }
 
         Divider()

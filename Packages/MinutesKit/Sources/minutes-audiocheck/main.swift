@@ -85,3 +85,25 @@ for start in starts {
     let time = format(Double(start) / rate).padding(toLength: 10, withPad: " ", startingAt: 0)
     print("\(time)  \(format(leak.lagMilliseconds))  \(format(leak.correlation, 3))  \(format(leak.echoDecibels))")
 }
+
+// After Minutes has cleaned the mic track, the same windows show how much echo is left.
+if let cleanedURL = audioFile(named: "mic", in: folder) {
+    let cleaned = try AudioAnalysis.read(cleanedURL)
+    let level = AudioAnalysis.level(of: cleaned.samples, sampleRate: cleaned.sampleRate)
+    let duration = format(level.durationSeconds, 2)
+    print("cleaned mic: \(duration) s, peak \(format(level.peak, 4)), RMS \(format(level.rmsDecibels)) dBFS")
+    print("window      lag ms  correlation  echo dB")
+    for start in starts {
+        let end = min(start + windowFrames, cleaned.samples.count, usable)
+        guard start < end, let leak = AudioAnalysis.measureLeak(
+            mic: cleaned.samples[start ..< end],
+            system: system.samples[start ..< end],
+            sampleRate: rate,
+        ) else {
+            print("\(format(Double(start) / rate))s: not enough audio")
+            continue
+        }
+        let time = format(Double(start) / rate).padding(toLength: 10, withPad: " ", startingAt: 0)
+        print("\(time)  \(format(leak.lagMilliseconds))  \(format(leak.correlation, 3))  \(format(leak.echoDecibels))")
+    }
+}

@@ -31,6 +31,8 @@ targets:
     platform: macOS
     sources:
       - path: App
+      - path: THIRD_PARTY_NOTICES.md
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.github.rosslopez.minutes
@@ -49,6 +51,8 @@ targets:
           - MinutesDiarization
           - MinutesLLM
           - MinutesStorage
+          - MinutesPipeline
+          - MinutesParakeet
     scheme:
       testTargets:
         - MinutesUITests

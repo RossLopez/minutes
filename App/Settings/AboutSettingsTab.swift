@@ -39,6 +39,12 @@ struct AboutSettingsTab: View {
             HStack(spacing: 16) {
                 Link("Source Code", destination: Self.sourceURL)
                 Link("GNU GPL v3", destination: Self.licenseURL)
+                if let notices = Bundle.main.url(forResource: "THIRD_PARTY_NOTICES", withExtension: "md") {
+                    Button("Third-Party Notices") {
+                        NSWorkspace.shared.open(notices)
+                    }
+                    .buttonStyle(.link)
+                }
             }
         }
         .padding()

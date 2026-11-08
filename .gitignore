@@ -16,3 +16,6 @@ Config/Local.xcconfig
 
 # Local Claude Code settings
 .claude/settings.local.json
+
+# Read-aloud script for the engine comparison, and other local test material
+Spikes/TranscriptionSpike/local/

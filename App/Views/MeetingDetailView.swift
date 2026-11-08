@@ -8,7 +8,8 @@ struct MeetingDetailView: View {
     let store: LibraryStore
     let entry: MeetingEntry
 
-    @State private var tab = MeetingTab.summary
+    /// Summaries don't exist until Milestone 5, so the transcript is the first useful thing to show.
+    @State private var tab = MeetingTab.transcript
 
     private var state: MeetingDisplayState {
         MeetingDisplayState(entry: entry)
@@ -45,12 +46,16 @@ struct MeetingDetailView: View {
             .pickerStyle(.segmented)
             .labelsHidden()
             .padding(20)
-            ContentUnavailableView(
-                tab.title,
-                systemImage: tab.systemImage,
-                description: Text(tab.emptyDescription),
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            if tab == .transcript {
+                TranscriptTab(store: store, entry: entry)
+            } else {
+                ContentUnavailableView(
+                    tab.title,
+                    systemImage: tab.systemImage,
+                    description: Text(tab.emptyDescription),
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
             PlayerBar(player: store.player, isEditingText: store.isEditingText)
@@ -231,7 +236,7 @@ private enum MeetingTab: String, CaseIterable, Identifiable {
     var emptyDescription: String {
         switch self {
         case .summary: "Summaries arrive in Milestone 5."
-        case .transcript: "Transcripts arrive in Milestone 3."
+        case .transcript: ""
         case .notes: "Notes arrive in Milestone 7."
         }
     }
