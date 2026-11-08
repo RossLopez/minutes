@@ -74,8 +74,8 @@ Nothing is transcribed during the meeting. When the user stops recording, a proc
 ### Transcription engine
 
 - English only for v1. Put the engine behind a `TranscriptionEngine` protocol so others can be added.
-- Before committing, spike and compare three on-device options on the same 30-minute test recording (word accuracy on custom vocabulary, speed, memory): Apple's `SpeechAnalyzer`/`SpeechTranscriber` (macOS 26), WhisperKit (English model, e.g. large-v3-turbo), and Parakeet via FluidAudio. Report results to me and recommend a default; let the user switch in Settings.
-- The ASR model downloads on first run alongside the LLM, with size shown.
+- Apple's `SpeechTranscriber` is the default. Parakeet TDT v2 via FluidAudio is an optional engine in Settings, downloaded when the user asks, with size shown. WhisperKit is not included. The comparison behind this is in [TRANSCRIPTION_SPIKE.md](TRANSCRIPTION_SPIKE.md).
+- macOS manages Apple's model, outside `~/Minutes/Models`. If it isn't installed, Minutes offers to install it and never starts that by itself.
 - Output word-level timestamps.
 
 ### Custom vocabulary

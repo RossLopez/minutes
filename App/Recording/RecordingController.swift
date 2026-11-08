@@ -26,7 +26,12 @@ final class RecordingController {
     private static let ticksPerDiskCheck = 150
     private static let startStallLimit = Duration.seconds(15)
 
-    private(set) var phase = Phase.idle
+    private(set) var phase = Phase.idle {
+        didSet {
+            pauseOrResumeTranscribing(after: oldValue)
+        }
+    }
+
     private(set) var elapsedSeconds = 0
     private(set) var micLevel: Float = 0
     private(set) var systemLevel: Float = 0
@@ -94,22 +99,6 @@ final class RecordingController {
             await finishCapture()
             await encodeFinishedMeeting()
         }
-    }
-
-    func dismissSavedBanner() {
-        lastSavedFolder = nil
-    }
-
-    func revealLastSaved() {
-        guard let lastSavedFolder else {
-            return
-        }
-        NSWorkspace.shared.activateFileViewerSelecting([lastSavedFolder])
-    }
-
-    func openPermissionsSettings() {
-        UserDefaults.standard.set(SettingsTab.permissions.rawValue, forKey: SettingsTab.storageKey)
-        settingsRequests += 1
     }
 
     // MARK: - Starting
@@ -289,11 +278,57 @@ final class RecordingController {
         meeting = nil
         activeFolder = nil
         await LibraryStore.shared.refresh(selecting: finished)
+        if let finished, lastSavedFolder == finished {
+            TranscriptionCenter.shared.queue.enqueue(finished)
+            // Asked here so the question comes when there's something to tell. It only ever shows
+            // once, and nothing waits for the answer.
+            if !useFakeAudio {
+                Task {
+                    await PermissionsModel.shared.requestNotifications()
+                }
+            }
+        }
         if let activity {
             ProcessInfo.processInfo.endActivity(activity)
         }
         activity = nil
         phase = .idle
+    }
+}
+
+// MARK: - Actions
+
+extension RecordingController {
+    func dismissSavedBanner() {
+        lastSavedFolder = nil
+    }
+
+    func revealLastSaved() {
+        guard let lastSavedFolder else {
+            return
+        }
+        NSWorkspace.shared.activateFileViewerSelecting([lastSavedFolder])
+    }
+
+    func openPermissionsSettings() {
+        openSettings(.permissions)
+    }
+
+    func openSettings(_ tab: SettingsTab) {
+        UserDefaults.standard.set(tab.rawValue, forKey: SettingsTab.storageKey)
+        settingsRequests += 1
+    }
+
+    /// Capture never competes with transcribing, and saving a recording needs the disk.
+    private func pauseOrResumeTranscribing(after oldPhase: Phase) {
+        guard (phase == .idle) != (oldPhase == .idle) else {
+            return
+        }
+        if phase == .idle {
+            TranscriptionCenter.shared.queue.unpause()
+        } else {
+            TranscriptionCenter.shared.queue.pause()
+        }
     }
 }
 
@@ -345,6 +380,7 @@ extension RecordingController {
         }
         phase = .idle
         await LibraryStore.shared.refresh()
+        TranscriptionCenter.shared.queue.resumeInterrupted(in: LibraryStore.shared.library)
     }
 
     // MARK: - Library changes

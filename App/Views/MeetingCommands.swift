@@ -1,10 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import MinutesStorage
 import SwiftUI
 
 /// Meeting actions in the File menu, acting on the selected meeting.
 struct MeetingCommands: Commands {
     private let store = LibraryStore.shared
+    private let center = TranscriptionCenter.shared
+
+    /// The selected meeting, if it's a finished one with audio to transcribe.
+    private var transcribeEntry: MeetingEntry? {
+        guard let entry = store.selectedEntry, MeetingDisplayState(entry: entry) == .ready else {
+            return nil
+        }
+        return entry
+    }
 
     var body: some Commands {
         CommandGroup(after: .textEditing) {
@@ -29,6 +39,13 @@ struct MeetingCommands: Commands {
             }
             .keyboardShortcut("r", modifiers: [.command, .shift])
             .disabled(store.selectedEntry == nil)
+
+            Button(transcribeEntry.flatMap(center.transcribeTitle) ?? "Transcribe") {
+                if let transcribeEntry {
+                    center.transcribe(transcribeEntry)
+                }
+            }
+            .disabled(transcribeEntry.flatMap(center.transcribeTitle) == nil)
 
             Button("Move to Trash") {
                 if let entry = store.selectedEntry {

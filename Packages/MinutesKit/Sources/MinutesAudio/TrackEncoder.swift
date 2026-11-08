@@ -80,7 +80,7 @@ public enum TrackEncoder {
         }
     }
 
-    private static func settings(for format: RecordingAudioFormat) -> [String: Any] {
+    static func settings(for format: RecordingAudioFormat) -> [String: Any] {
         var settings: [String: Any] = [
             AVSampleRateKey: Double(TrackTimeline.sampleRate),
             AVNumberOfChannelsKey: 1,

@@ -12,6 +12,10 @@ The spec originally targeted macOS 26. Ross chose to support only macOS 27, the 
 - CI runs on the `xcode-27` image, which runs macOS 27. The `macos-26` and `macos-latest` images are still on macOS 26.
 - The Homebrew cask will use `depends_on macos: ">= :golden_gate"`.
 
+### Apple is the default transcription engine (Nov 6, 2026)
+
+Ross chose Apple's `SpeechTranscriber` as the default, with Parakeet TDT v2 through FluidAudio as an optional download, and left out WhisperKit. I had recommended Parakeet as the default, because it got 49 of 52 vocabulary terms against Apple's 30. `SpeechTranscriber` ignores contextual strings, so on the default engine only the replacement step after transcription helps with custom terms, and Settings says so. The numbers are in [TRANSCRIPTION_SPIKE.md](TRANSCRIPTION_SPIKE.md).
+
 ### Speaker memory is in v1 (Nov 6, 2026)
 
 Ross moved Speaker memory from the roadmap into v1. It's built at Milestone 4, because it needs diarization's voice data and that milestone's naming UI. It's opt-in, because a voice profile is biometric data about other people, and some places regulate it. Milestone 4's planning has to confirm the diarization engine exposes speaker embeddings.
@@ -118,13 +122,116 @@ That's no visible stall, so the index can wait for Milestone 8. Real meetings wi
 
 The file panel behind **Move…** and **Locate…** runs in another process, so no automated check here has chosen a folder through it.
 
+## Milestone 3 measurements (Nov 6, 2026)
+
+On the M5 Pro with 24 GB, Debug build, in the app. Engine comparison is in `docs/TRANSCRIPTION_SPIKE.md`.
+
+**A 4-hour meeting from end to end,** with the same AMI audio on both tracks, so the mic cleans to near silence and no vocabulary list:
+
+| | Parakeet | Apple |
+| --- | --- | --- |
+| Cleaning the mic track | 366 s | 362 s |
+| Transcribing system audio | 102 s | 128 s |
+| Whole run | 500 s | 532 s |
+| Peak memory (footprint) | 396 MB | 76 MB, plus Apple's system service |
+| Network connections seen | None | None |
+| Lines in the transcript | 1,547 | 1,590 |
+
+Parakeet with a vocabulary list peaked at 797 MB on 4 hours when measured through the engine alone. Cleaning is the slowest step, at about 40× real time, and memory doesn't grow with its length. Opening that transcript and playing from a line 2 hours in used 83 MB.
+
+**Half an hour on two tracks in the app:** 18 s with Apple, 55 s with Parakeet and a one-term list.
+
+**Killed with `kill -9` during cleaning, each transcription step in turn:** it resumed from the last finished step every time, and ended with a complete transcript and no `.processing` folder.
+
+**Logs:** a search of the app's log and console output for phrases from these transcripts found none.
+
 ## Apple API notes
 
 Measurements are from a MacBook Pro on macOS 27.0.1 with a quiet test tone played by `afplay`, unless a note says otherwise.
 
+### `SpeechTranscriber` ignores contextual strings (Nov 6, 2026)
+
+With 24 terms in `AnalysisContext.contextualStrings[.general]`, `SpeechTranscriber`'s output was word-for-word identical to a run without them, whether the context was given at creation or through `setContext`. `DictationTranscriber` does use them, doubling its term hits from 16 to 32 of 52, but its overall accuracy is lower. The headers don't mention this. Full numbers are in [TRANSCRIPTION_SPIKE.md](TRANSCRIPTION_SPIKE.md).
+
 ### `.searchable` adds no ⌘F (Nov 6, 2026)
 
 A `.searchable` field in a `NavigationSplitView` sidebar gets no Find command in the Edit menu and doesn't respond to ⌘F. We add the command ourselves and focus the field through `searchFocused`.
+
+### `AssetInventory.status` depends on a transcriber's attribute options (Nov 6, 2026)
+
+On macOS 27.0.1 with the English model installed, `status(forModules:)` returned `.installed` for `attributeOptions: []` and `[.audioTimeRange, .transcriptionConfidence]`, but `.supported` for `[.audioTimeRange]` alone. `assetInstallationRequest(supporting:)` returned `nil` in all three, and transcription works in all three. Minutes asks for both attributes, which is what the comparison measured, and treats `nil` from `assetInstallationRequest` as installed.
+
+### Apple's speech engine needs no permission (Nov 6, 2026)
+
+`SpeechTranscriber` transcribed a file in the signed, hardened app without a prompt or a usage description, so Permissions doesn't need a row for it.
+
+### UI tests need Automation Mode (Nov 6, 2026)
+
+`xcodebuild test` on UI tests asks macOS to turn on Automation Mode, which needs the user's authentication on this Mac. With the screen locked it fails with "System authentication is running", and if nobody answers it fails with "Timed out while enabling automation mode". Neither is a test failure.
+
+### `fixedSize` on wrapping text can overflow the window (Nov 6, 2026)
+
+`.fixedSize(horizontal: false, vertical: true)` on a line of text inside an `HStack` pushed the whole window's content up by about 130 pt, including the sidebar, and put the player bar out of sight. The window itself didn't change size. SwiftUI measures the minimum height with a width near zero, where each letter gets its own line, and `fixedSize` makes that the true minimum. **Workaround:** leave it off. `Text` already wraps when it's given the room.
+
+### Echo removal and clock drift (Nov 6, 2026)
+
+Measured on synthetic echo in `MicCleanerTests`, because a real room can't be repeated exactly. Settled echo is 37.2 dB lower, with echo found at −21.2 dB. A voice over the echo changes by −0.07 dB, and echo is 21.2 dB lower while both people talk. After a 5 ms timing jump it's 30.8 dB lower, and 29.8 dB for echo that starts late.
+
+Drift between the tracks is the weak spot:
+
+| Drift | Echo removed |
+| --- | --- |
+| 2.3 ppm (measured on this Mac's built-in devices) | 30.6 dB |
+| 5 ppm | 23.3 dB |
+| 10 ppm | 17.9 dB |
+| 20 ppm | 9.5 dB |
+| 40 ppm | 6.0 dB |
+
+So a mic and speakers on separate clocks, like a USB headset's mic with the Mac's speakers, could fall short of the 15 dB target. Nothing in Minutes corrects drift.
+
+### Echo through real speakers (Nov 7, 2026)
+
+One run: 90 seconds of a public AMI meeting played by `afplay` through MacBook Pro Speakers while Minutes recorded from the built-in mic, with nobody talking. Output volume read 31% before the run and 38% after it. Nothing in the test set it, so it's unknown which applied during the recording.
+
+| Measure, less room noise of −50.4 dBFS | Raw mic | Cleaned mic | Removed |
+| --- | --- | --- | --- |
+| Whole playback | −35.9 dBFS | −51.0 dBFS | 15.1 dB |
+| First 25 seconds of playback | −37.1 dBFS | −48.3 dBFS | 11.2 dB |
+| Settled, last 45 seconds | −35.3 dBFS | −56.8 dBFS | 21.5 dB |
+
+| Words heard on the mic track | Raw mic | Cleaned mic |
+| --- | --- | --- |
+| Apple Speech | 274 | 0 |
+| Parakeet | 269 | 47 in the comparison tool, 45 in the app |
+
+- **Real echo is harder than synthetic.** Settled removal is 21.5 dB against 37.2 dB on synthetic echo, and it takes tens of seconds to settle. Don't quote `minutes-audiocheck`'s cleaned figures (−41.8 to −58.3 dB) as echo: those windows show lags of 241 to 370 ms and correlation under 0.13, so nothing aligned was found. Compare levels instead.
+- **Parakeet hears words in what's left.** In the app they became 10 false Me lines between 52.5 and 82.4 s. They're garbled, and mostly don't match what was playing, so the duplicate filter proposed in the Milestone 3 plan wouldn't catch them.
+- **Those words are almost as quiet as the room.** Cleaned level during them is −2.5 to 3.9 dB against room noise, with a median of 0.8 dB.
+
+### Filtering leftover echo words (Nov 8, 2026)
+
+A second run played the same clip at 50% volume while Ross read a script for about 25 seconds: one part in a normal voice, one quietly, one trailing off. With the louder playback, raw echo measured −15 to −19 dB and removal settled at 12 to 16 dB. Removal stayed at 4 to 6 dB while he talked over the playback, because the canceller adapts less during double talk.
+
+`LeftoverEchoFilter` drops a phrase of mic words when its loudest word is less than 10 dB above the mic track's background and the system track had sound at that moment. Words further than 0.5 s apart are separate phrases. The background is the 10th percentile of 0.1 s block levels in the cleaned mic, leaving out digital silence. Nothing is dropped when `mic.m4a` is an exact copy of the original, or when the levels can't be read.
+
+| Phrase's loudest word, above background | Nov 7 (echo only) | Nov 8 (echo) | Nov 8 (Ross) |
+| --- | --- | --- | --- |
+| Range | Up to 4.6 dB | Up to 6.4 dB | 14.7 to 17.5 dB |
+
+| Words kept, by cutoff | 6 dB | 8 to 12 dB |
+| --- | --- | --- |
+| Ross's words, Apple / Parakeet | 73 of 73 / 75 of 75 | 73 of 73 / 75 of 75 |
+| Echo words, Nov 8, Apple / Parakeet | 4 of 11 / 30 of 103 | 4 of 11 / 6 of 103 |
+| Echo words, Nov 7, Parakeet | 0 of 47 | 0 of 47 |
+
+The app with Parakeet and the 10 dB cutoff matched this: no Me lines on Nov 7, and only the script plus 6 echo words on Nov 8. Others kept all 268 words.
+
+- **What gets through:** echo straight after the user stops talking joins the user's phrase. Here it added "High catching is important. It's not" to Ross's last line. Single words' levels don't separate them: Ross's quietest words were 5.9 to 6.7 dB, and the attached echo words 4.8 to 7.2. How much echo removal took from each word overlaps too, 0 to 14.3 dB for his words and 7.9 to 15.5 for the echo.
+- **Not covered:** more than 50% volume, someone further from the mic than a laptop user, and any other room or Mac. Louder echo could clear the 10 dB cutoff.
+
+### FluidAudio's lexicon isn't in the app (Nov 6, 2026)
+
+`docs/TRANSCRIPTION_SPIKE.md` first assumed its 1 MB LuxTTS lexicon came under FluidAudio's license. It doesn't: its file says the data comes from eSpeak NG (GPL-3.0-or-later) and FrequencyWords (CC BY-SA 4.0). With traits off, Minutes doesn't link that target and the built app has no copy of it, so neither license applies to what ships. Turning on FluidAudio's `TTS` trait would change that.
 
 ### A focused field removed by selection gets no focus change first (Nov 6, 2026)
 

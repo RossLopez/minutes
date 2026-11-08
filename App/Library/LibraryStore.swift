@@ -13,7 +13,12 @@ final class LibraryStore {
 
     private static let logger = Logger(subsystem: "io.github.rosslopez.minutes", category: "library")
 
-    private(set) var library: MinutesLibrary
+    private(set) var library: MinutesLibrary {
+        didSet {
+            currentLibrary.set(library)
+        }
+    }
+
     private(set) var entries: [MeetingEntry] = []
     private(set) var sections: [MeetingSection] = []
     private(set) var selection: URL?
@@ -34,11 +39,13 @@ final class LibraryStore {
     }
 
     let player = PlayerModel()
+    let currentLibrary: CurrentLibrary
 
     @ObservationIgnored private let pointer: LibraryPointer
     @ObservationIgnored private let defaultRoot: URL
     @ObservationIgnored private let trashFolderForTests: URL?
     @ObservationIgnored private var scanGeneration = 0
+    @ObservationIgnored private var beingTrashed: Set<URL> = []
 
     private init() {
         var defaultRoot = MinutesLibrary.defaultRoot
@@ -55,7 +62,9 @@ final class LibraryStore {
         self.defaultRoot = defaultRoot
         self.pointer = pointer
         self.trashFolderForTests = trashFolderForTests
-        library = MinutesLibrary(root: pointer.root(default: defaultRoot))
+        let library = MinutesLibrary(root: pointer.root(default: defaultRoot))
+        self.library = library
+        currentLibrary = CurrentLibrary(library)
     }
 
     var selectedEntry: MeetingEntry? {
@@ -170,7 +179,9 @@ final class LibraryStore {
         let wasPlayerOpen = player.loadedFolder == entry.id
         let position = player.state
         do {
-            let renamed = try library.rename(entry.folder, to: title)
+            // Through the queue, so a job running on this meeting follows its folder.
+            let library = library
+            let renamed = try TranscriptionCenter.shared.queue.move(entry.id) { try library.rename($0, to: title) }
             RecordingController.shared.folderMoved(from: entry.id, to: renamed.url)
             if selection == entry.id {
                 selection = renamed.url
@@ -191,13 +202,19 @@ final class LibraryStore {
     }
 
     func moveToTrash(_ entry: MeetingEntry) async {
-        guard !isActive(entry) else {
+        guard !isActive(entry), beingTrashed.insert(entry.id).inserted else {
             return
+        }
+        defer {
+            beingTrashed.remove(entry.id)
         }
         let neighbor = neighbor(of: entry)
         if player.loadedFolder == entry.id {
             player.unload()
         }
+        let queue = TranscriptionCenter.shared.queue
+        let wasQueued = queue.activity?.folder == entry.id || queue.isWaiting(entry.id)
+        await queue.remove(entry.id)
         do {
             if let trashFolderForTests {
                 try FileManager.default.createDirectory(at: trashFolderForTests, withIntermediateDirectories: true)
@@ -218,6 +235,9 @@ final class LibraryStore {
         } catch {
             Self.logger.error("Moving to Trash failed: \(String(describing: error), privacy: .public)")
             syncPlayer()
+            if wasQueued {
+                queue.enqueue(entry.id)
+            }
             RecordingAlerts.show(
                 title: "Minutes Couldn't Move This Meeting to the Trash",
                 message: "It's still in your library. You can try moving its folder in Finder.",
@@ -285,6 +305,7 @@ extension LibraryStore {
         player.unload()
         selection = nil
         await refresh()
+        TranscriptionCenter.shared.queue.resumeInterrupted(in: library)
     }
 
     func useDefaultLocation() async {
@@ -296,14 +317,15 @@ extension LibraryStore {
         player.unload()
         selection = nil
         await refresh()
+        TranscriptionCenter.shared.queue.resumeInterrupted(in: library)
     }
 
     /// Moves the whole library into a folder the user chooses.
     func moveLibrary() async {
-        guard RecordingController.shared.phase == .idle else {
+        guard RecordingController.shared.phase == .idle, !TranscriptionCenter.shared.isBusy else {
             RecordingAlerts.show(
                 title: "Minutes Is Busy",
-                message: "Wait for the recording to finish saving, then move your library.",
+                message: "Wait for recording, transcribing and downloads to finish, then move your library.",
             )
             return
         }
