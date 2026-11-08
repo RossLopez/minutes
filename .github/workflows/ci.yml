@@ -18,6 +18,8 @@ jobs:
   build-and-test:
     # macOS 27 with Xcode 27. The macos-26 and macos-latest images can't run this app's minimum OS.
     runs-on: xcode-27
+    # A full run takes about 5 minutes. Without a limit, a hang runs for GitHub's default of 6 hours.
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -52,8 +54,10 @@ jobs:
             exit 1
           fi
 
+      # Includes building the package. If the tests hang, the script prints the stuck threads and fails.
       - name: Unit tests
-        run: swift test --package-path Packages/MinutesKit
+        timeout-minutes: 20
+        run: scripts/test-with-watchdog.sh 15
 
       - name: Generate Xcode project
         run: xcodegen generate
