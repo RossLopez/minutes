@@ -27,9 +27,39 @@ private func encodedTone(
     return m4a
 }
 
+/// Lets one render run at a time. Several mix readers at once on a busy machine can all stop for
+/// good inside CoreMedia, which hung CI on its 3 cores (see docs/NOTES.md).
+@MainActor
+private enum RenderGate {
+    private static var isBusy = false
+    private static var waiting: [CheckedContinuation<Void, Never>] = []
+
+    static func run<T>(_ work: () async throws -> T) async throws -> T {
+        if isBusy {
+            await withCheckedContinuation { waiting.append($0) }
+        }
+        isBusy = true
+        defer {
+            if waiting.isEmpty {
+                isBusy = false
+            } else {
+                waiting.removeFirst().resume()
+            }
+        }
+        return try await work()
+    }
+}
+
 /// Renders the composition through the mix, the way playback would, without audio hardware.
 @MainActor
 private func render(_ composition: PlaybackComposition, muted: Set<PlaybackTrack> = []) async throws -> [Float] {
+    try await RenderGate.run {
+        try await renderNow(composition, muted: muted)
+    }
+}
+
+@MainActor
+private func renderNow(_ composition: PlaybackComposition, muted: Set<PlaybackTrack>) async throws -> [Float] {
     let reader = try AVAssetReader(asset: composition.asset)
     let output = AVAssetReaderAudioMixOutput(
         audioTracks: composition.asset.tracks,
@@ -196,6 +226,29 @@ func `muting a track silences it and leaves the other`(
     await #expect(throws: PlaybackError.noAudio) {
         try await PlaybackComposition.make(mic: nil, system: folder.file("gone.m4a"))
     }
+}
+
+/// Without `RenderGate`, this hangs on a machine whose cores are all busy.
+@Test(.timeLimit(.minutes(1))) @MainActor func `many renders at once all finish`() async throws {
+    let folder = try TemporaryFolder()
+    let mic = try await encodedTone(frequency: micFrequency, in: folder, name: "mic")
+    let system = try await encodedTone(frequency: systemFrequency, in: folder, name: "system")
+    try await withThrowingTaskGroup(of: Double.self) { group in
+        for _ in 0 ..< 2 * ProcessInfo.processInfo.activeProcessorCount {
+            group.addTask {
+                try await systemStrength(mic: mic, system: system)
+            }
+        }
+        for try await strength in group {
+            #expect(strength > 0.05)
+        }
+    }
+}
+
+@MainActor
+private func systemStrength(mic: URL, system: URL) async throws -> Double {
+    let samples = try await render(PlaybackComposition.make(mic: mic, system: system))
+    return strength(of: systemFrequency, in: tail(samples))
 }
 
 @Test @MainActor func `the length follows the longer track`() async throws {

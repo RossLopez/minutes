@@ -319,3 +319,21 @@ On macOS 27, `MenuBarExtra("Minutes", systemImage: "waveform")` exposes the stat
 ### `NSAudioCaptureUsageDescription` belongs in a real Info.plist (Nov 5, 2026)
 
 Third-party reports say Xcode's `INFOPLIST_KEY_*` build settings silently drop this key. This is untested here. To avoid the risk, the app uses a hand-written `App/Info.plist`, and `scripts/verify-bundle.sh` checks the key in the built bundle.
+
+### Several `AVAssetReaderAudioMixOutput` readers can hang for good on a busy machine (Nov 8, 2026)
+
+After Milestone 3, CI's unit tests hung until cancelled, twice. The playback tests render compositions through `AVAssetReaderAudioMixOutput`, and a stack sample showed every one blocked in `copyNextSampleBuffer`. Every CoreMedia reader thread (`readerOfflineMixer`, `audioqueue.source`, `audiomentor`) was waiting, and none was working. The same tests passed on the same runner image before Milestone 3, which added CPU-heavy tests to the same process. The runner has 3 cores.
+
+Reproduced on an M5 Pro with every core kept busy:
+
+| Readers at once | Cores busy | Result |
+| --- | --- | --- |
+| 1 | Yes | Finishes |
+| 6 (the playback tests) | Yes | Finishes |
+| 36 | No | Finishes in 0.4 s |
+| 36 | Yes | Hangs in 5 runs of 5, and doesn't recover when the load stops |
+| 36, one at a time | Yes | Finishes in about 2 s, 3 runs of 3 |
+
+It isn't Swift's shared threads running out. 36 readers on a one-thread pool (`LIBDISPATCH_COOPERATIVE_POOL_STRICT=1`) finish when the CPU is free.
+
+**Workaround:** the tests render one at a time through `RenderGate` in `PlaybackTests.swift`, and `many renders at once all finish` guards it. The app doesn't read compositions this way: playback uses `AVPlayer`. Any future code that reads several compositions at once should do the same. CI also runs the unit tests through `scripts/test-with-watchdog.sh`, which prints a stack sample if they run past 15 minutes.
