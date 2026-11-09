@@ -101,6 +101,20 @@ public final class ProcessingQueue {
         }
     }
 
+    /// Tells the other voices apart in a finished meeting, keeping its transcription. For meetings
+    /// processed before the diarizer's model was installed.
+    public func identifySpeakers(_ folder: URL) {
+        guard activity?.folder != folder, !isWaiting(folder) else {
+            return
+        }
+        do {
+            try MeetingPipeline.prepareToIdentifySpeakers(MeetingFolder(url: folder))
+            enqueue(folder)
+        } catch {
+            Self.logger.error("Couldn't identify speakers: \(String(describing: type(of: error)), privacy: .public)")
+        }
+    }
+
     /// At launch: picks up what a quit or crash interrupted. Meetings the user stopped stay stopped.
     public func resumeInterrupted(in library: MinutesLibrary) {
         enqueue(meetings(in: library) { $0 == .queued })

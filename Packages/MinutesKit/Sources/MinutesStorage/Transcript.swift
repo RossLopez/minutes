@@ -20,7 +20,7 @@ public struct TranscriptWord: Codable, Equatable, Sendable {
 }
 
 public struct TranscriptSegment: Codable, Equatable, Sendable {
-    /// `me` or `others` for now. Telling people apart adds more, like `speaker-1`.
+    /// `me`, `speaker-1`, `speaker-2` and so on, or `others` when the other voices weren't told apart.
     public var speaker: String
     public var start: Double
     public var end: Double
@@ -65,16 +65,29 @@ public struct Transcript: Codable, Equatable, Sendable {
         schemaVersion > Self.currentSchemaVersion
     }
 
+    /// The label for a speaker nobody has named: "Me", "Others", or "Speaker 2" for `speaker-2`.
     public static func displayName(forSpeaker speaker: String) -> String {
         switch speaker {
         case Speaker.me: "Me"
         case Speaker.others: "Others"
-        default: speaker
+        default: speakerNumber(speaker).map { "Speaker \($0)" } ?? speaker
         }
     }
 
+    /// 2 for `speaker-2`.
+    public static func speakerNumber(_ speaker: String) -> Int? {
+        guard let match = speaker.wholeMatch(of: /speaker-(\d+)/) else {
+            return nil
+        }
+        return Int(match.1)
+    }
+
     /// The readable version. Minutes regenerates `transcript.md` from this, so edits to that file don't last.
-    public func markdown(title: String, startedAt: Date) -> String {
+    public func markdown(
+        title: String,
+        startedAt: Date,
+        name: (String) -> String = Transcript.displayName(forSpeaker:),
+    ) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd HH:mm"
@@ -83,7 +96,7 @@ public struct Transcript: Codable, Equatable, Sendable {
         var lastSpeaker: String?
         for segment in segments {
             if segment.speaker != lastSpeaker {
-                lines += ["", "**\(Self.displayName(forSpeaker: segment.speaker))** \(Self.clock(segment.start))"]
+                lines += ["", "**\(name(segment.speaker))** \(Self.clock(segment.start))"]
                 lastSpeaker = segment.speaker
             }
             lines += ["", segment.text]

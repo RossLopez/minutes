@@ -2,7 +2,7 @@
 
 import Foundation
 
-/// The contents of `meeting.json`. Later milestones add speakers, templates and pipeline state.
+/// The contents of `meeting.json`.
 public struct MeetingMetadata: Codable, Equatable, Sendable {
     public enum State: String, Codable, Sendable {
         /// Audio is being captured, or capture was cut off by a crash.
@@ -35,7 +35,40 @@ public struct MeetingMetadata: Codable, Equatable, Sendable {
         }
     }
 
-    public static let currentSchemaVersion = 1
+    /// A name for one speaker in this meeting, keyed by the speaker's ID in `transcript.json`.
+    public struct Speaker: Codable, Equatable, Sendable {
+        public var name: String?
+        /// The saved voice profile this speaker's name came from, or that their voice was added to.
+        public var profile: UUID?
+        /// A profile that sounds like this speaker, but not closely enough to apply its name.
+        public var suggestion: Suggestion?
+        /// Profiles the user said this speaker isn't, so they aren't suggested again.
+        public var declinedProfiles: [UUID]?
+
+        public init(name: String? = nil, profile: UUID? = nil, suggestion: Suggestion? = nil) {
+            self.name = name
+            self.profile = profile
+            self.suggestion = suggestion
+        }
+
+        /// Holds nothing worth keeping in the file.
+        public var isEmpty: Bool {
+            name == nil && profile == nil && suggestion == nil && (declinedProfiles ?? []).isEmpty
+        }
+    }
+
+    public struct Suggestion: Codable, Equatable, Sendable {
+        public var name: String
+        public var profile: UUID
+
+        public init(name: String, profile: UUID) {
+            self.name = name
+            self.profile = profile
+        }
+    }
+
+    /// 2 added `speakers`. A version 1 app would drop names when saving, so it opens these read-only.
+    public static let currentSchemaVersion = 2
 
     public var schemaVersion = MeetingMetadata.currentSchemaVersion
     public var id: UUID
@@ -53,6 +86,8 @@ public struct MeetingMetadata: Codable, Equatable, Sendable {
     public var system: Track
     /// What's happened since Stop. `nil` for meetings recorded before there was anything to do.
     public var processing: ProcessingState?
+    /// Names for the speakers in `transcript.json`. `nil` for meetings with nobody named.
+    public var speakers: [String: Speaker]?
 
     public init(
         id: UUID = UUID(),
@@ -79,6 +114,11 @@ public struct MeetingMetadata: Codable, Equatable, Sendable {
     /// Saving a file like this would drop fields this version doesn't know, so it's read-only.
     public var isNewerThanThisApp: Bool {
         schemaVersion > Self.currentSchemaVersion
+    }
+
+    /// The name to show: the one given in this meeting, or a label like "Speaker 2".
+    public func displayName(forSpeaker speaker: String) -> String {
+        speakers?[speaker]?.name ?? Transcript.displayName(forSpeaker: speaker)
     }
 
     static let encoder: JSONEncoder = {

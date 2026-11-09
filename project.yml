@@ -52,7 +52,7 @@ targets:
           - MinutesLLM
           - MinutesStorage
           - MinutesPipeline
-          - MinutesParakeet
+          - MinutesFluidAudio
     scheme:
       testTargets:
         - MinutesUITests

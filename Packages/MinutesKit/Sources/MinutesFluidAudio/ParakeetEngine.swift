@@ -15,13 +15,6 @@ public struct ParakeetEngine: TranscriptionEngine {
     private static let speechFolderName = "parakeet-tdt-0.6b-v2"
     private static let vocabularyFolderName = "parakeet-ctc-110m-coreml"
 
-    /// FluidAudio's debug output includes transcript text, and Minutes never logs that.
-    private static let libraryConfigured: Void = {
-        AppLogger.minimumLevel = .error
-        AppLogger.mirrorsToConsole = false
-        ModelHub.offlineMode = true
-    }()
-
     public let id = ParakeetEngine.engineID
     public let modelName = "Parakeet TDT 0.6b v2"
     /// About 450 MB for speech and 99 MB for vocabulary, as measured in docs/TRANSCRIPTION_SPIKE.md.
@@ -32,7 +25,7 @@ public struct ParakeetEngine: TranscriptionEngine {
 
     public init(modelsFolder: @escaping @Sendable () -> URL) {
         self.modelsFolder = modelsFolder
-        _ = Self.libraryConfigured
+        _ = FluidNetwork.configured
     }
 
     public func modelStatus() async -> TranscriptionModelStatus {
@@ -57,17 +50,16 @@ public struct ParakeetEngine: TranscriptionEngine {
         try manager.createDirectory(at: incoming, withIntermediateDirectories: true)
         defer { try? manager.removeItem(at: incoming) }
 
-        ModelHub.offlineMode = false
-        defer { ModelHub.offlineMode = true }
-
-        let speechWeight = 0.82
-        let speech = incoming.appendingPathComponent(Self.speechFolderName, isDirectory: true)
-        _ = try await AsrModels.download(to: speech, version: .v2) { update in
-            progress(update.fractionCompleted * speechWeight)
+        try await FluidNetwork.allowingDownloads {
+            let speechWeight = 0.82
+            let speech = incoming.appendingPathComponent(Self.speechFolderName, isDirectory: true)
+            _ = try await AsrModels.download(to: speech, version: .v2) { update in
+                progress(update.fractionCompleted * speechWeight)
+            }
+            try Task.checkCancellation()
+            let vocabulary = incoming.appendingPathComponent(Self.vocabularyFolderName, isDirectory: true)
+            _ = try await CtcModels.download(to: vocabulary, variant: .ctc110m)
         }
-        try Task.checkCancellation()
-        let vocabulary = incoming.appendingPathComponent(Self.vocabularyFolderName, isDirectory: true)
-        _ = try await CtcModels.download(to: vocabulary, variant: .ctc110m)
         progress(1)
 
         for name in [Self.speechFolderName, Self.vocabularyFolderName] {

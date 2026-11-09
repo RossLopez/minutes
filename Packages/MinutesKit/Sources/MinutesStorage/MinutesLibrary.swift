@@ -39,6 +39,45 @@ public struct MinutesLibrary: Sendable {
         root.appendingPathComponent(".minutes", isDirectory: true)
     }
 
+    /// Saved voice profiles. Made only when speaker memory saves the first one.
+    public var speakersFolder: URL {
+        root.appendingPathComponent("Speakers", isDirectory: true)
+    }
+
+    public var speakerProfiles: SpeakerProfileStore {
+        SpeakerProfileStore(folder: speakersFolder)
+    }
+
+    /// Names given to speakers in any meeting, plus saved profiles, most recently used first.
+    /// For suggestions while naming someone.
+    public func knownSpeakerNames() -> [String] {
+        var latest: [String: (name: String, date: Date)] = [:]
+        func add(_ name: String, _ date: Date) {
+            let key = name.lowercased()
+            if let seen = latest[key], seen.date >= date {
+                return
+            }
+            latest[key] = (name, date)
+        }
+        for entry in meetings() {
+            for (speaker, info) in entry.metadata?.speakers ?? [:] where speaker != Transcript.Speaker.me {
+                if let name = info.name {
+                    add(name, entry.date)
+                }
+            }
+        }
+        for profile in speakerProfiles.profiles() {
+            add(profile.name, profile.lastHeard ?? profile.updatedAt)
+        }
+        return latest.values
+            .sorted { first, second in
+                first.date != second.date
+                    ? first.date > second.date
+                    : first.name.localizedStandardCompare(second.name) == .orderedAscending
+            }
+            .map(\.name)
+    }
+
     public var vocabularyFile: URL {
         root.appendingPathComponent("Vocabulary.txt")
     }
@@ -161,7 +200,7 @@ public struct MinutesLibrary: Sendable {
         let renamed = MeetingFolder(url: destination)
         // The readable transcript starts with the title. If this fails, the transcript itself is still right.
         if let transcript = try? renamed.loadTranscript() {
-            try? renamed.save(transcript, title: title, startedAt: metadata.startedAt)
+            try? renamed.saveReadableTranscript(transcript, for: metadata)
         }
         return renamed
     }

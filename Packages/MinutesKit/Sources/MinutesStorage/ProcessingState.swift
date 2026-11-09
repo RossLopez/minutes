@@ -7,6 +7,8 @@ public enum ProcessingStep: String, Codable, CaseIterable, Sendable {
     case cleanMic
     case transcribeMic
     case transcribeSystem
+    /// Tells the other voices apart. Skipped, leaving them as Others, when the model isn't installed.
+    case diarizeSystem
     case merge
 }
 

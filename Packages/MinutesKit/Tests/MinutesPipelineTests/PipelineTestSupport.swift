@@ -2,6 +2,7 @@
 
 import Foundation
 import MinutesAudio
+import MinutesDiarization
 import MinutesPipeline
 import MinutesStorage
 import MinutesTranscription
@@ -74,6 +75,8 @@ final class FakeEngine: TranscriptionEngine, Sendable {
         var failure: any Error?
         var gate: Gate?
         var duringCall: (@Sendable () -> Void)?
+        /// What the system track says, instead of "their line".
+        var systemWords: [TranscriptWord]?
     }
 
     let id: String
@@ -112,11 +115,11 @@ final class FakeEngine: TranscriptionEngine, Sendable {
         workFolder: URL,
         progress: @escaping @Sendable (Double) -> Void,
     ) async throws -> [TranscriptWord] {
-        let (gate, failure, duringCall) = state.withLock { state in
+        let (gate, failure, duringCall, systemWords) = state.withLock { state in
             state.calls.append(audio.lastPathComponent)
             state.vocabularies.append(vocabulary)
             defer { state.failure = nil }
-            return (state.gate, state.failure, state.duringCall)
+            return (state.gate, state.failure, state.duringCall, state.systemWords)
         }
         #expect(FileManager.default.fileExists(atPath: workFolder.path))
         progress(0.5)
@@ -126,9 +129,75 @@ final class FakeEngine: TranscriptionEngine, Sendable {
         if let failure {
             throw failure
         }
+        if audio.lastPathComponent == "system.m4a", let systemWords {
+            return systemWords
+        }
         return audio.lastPathComponent == "system.m4a"
             ? [TranscriptWord(text: "their", start: 1, end: 1.5), TranscriptWord(text: "line", start: 1.5, end: 2)]
             : [TranscriptWord(text: "my", start: 3, end: 3.5), TranscriptWord(text: "tannium", start: 3.5, end: 4)]
+    }
+}
+
+/// Hears the turns it's given, and counts what it's asked to do.
+final class FakeDiarizer: SpeakerDiarizer, Sendable {
+    struct State {
+        var status = DiarizationModelStatus.installed
+        var diarization = Diarization(turns: [])
+        var calls = 0
+        var embeddingSpans: [[ClosedRange<Double>]] = []
+        var embedding: [Float] = [1, 0]
+        var failure: any Error?
+        var gate: Gate?
+    }
+
+    let id = "fake-diarizer"
+    let modelName = "fake diarizer"
+    let downloadSizeBytes: Int64 = 100
+    let state = Mutex(State())
+
+    var calls: Int {
+        state.withLock { $0.calls }
+    }
+
+    func modelStatus() async -> DiarizationModelStatus {
+        state.withLock { $0.status }
+    }
+
+    func installModel(progress _: @escaping @Sendable (Double) -> Void) async throws {
+        state.withLock { $0.status = .installed }
+    }
+
+    func removeModel() async throws {
+        state.withLock { $0.status = .notInstalled }
+    }
+
+    func diarize(
+        audio: URL,
+        workFolder: URL,
+        progress: @escaping @Sendable (Double) -> Void,
+    ) async throws -> Diarization {
+        #expect(audio.lastPathComponent == "system.m4a")
+        #expect(FileManager.default.fileExists(atPath: workFolder.path))
+        let (gate, failure, diarization) = state.withLock { state in
+            state.calls += 1
+            defer { state.failure = nil }
+            return (state.gate, state.failure, state.diarization)
+        }
+        progress(0.5)
+        await gate?.pass()
+        try Task.checkCancellation()
+        if let failure {
+            throw failure
+        }
+        return diarization
+    }
+
+    func embedding(audio _: URL, spans: [ClosedRange<Double>], workFolder: URL) async throws -> [Float] {
+        #expect(FileManager.default.fileExists(atPath: workFolder.path))
+        return state.withLock { state in
+            state.embeddingSpans.append(spans)
+            return state.embedding
+        }
     }
 }
 
@@ -171,6 +240,17 @@ final class TestSetup: Sendable {
     let preferred = Mutex("fake")
     let vocabulary = Mutex<[VocabularyEntry]>([])
     let other = FakeEngine(id: "other")
+    let diarizer = FakeDiarizer()
+    let remembersVoices = Mutex(false)
+    let yourName = Mutex<String?>(nil)
+
+    var naming: SpeakerNaming {
+        SpeakerNaming(
+            diarizer: { [diarizer] in diarizer },
+            profiles: library.speakerProfiles,
+            remembersVoices: { [self] in remembersVoices.withLock { $0 } },
+        )
+    }
 
     var pipeline: MeetingPipeline {
         MeetingPipeline(
@@ -183,6 +263,13 @@ final class TestSetup: Sendable {
             },
             vocabulary: { [self] in
                 vocabulary.withLock { $0 }
+            },
+            diarizer: { [diarizer] in diarizer },
+            speakerMemory: { [self] in
+                remembersVoices.withLock { $0 } ? library.speakerProfiles : nil
+            },
+            yourName: { [self] in
+                yourName.withLock { $0 }
             },
         )
     }

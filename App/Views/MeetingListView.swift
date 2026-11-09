@@ -150,6 +150,12 @@ struct MeetingActions: View {
             }
         }
 
+        if SpeakerCenter.shared.canIdentifySpeakers(in: entry) {
+            Button("Identify Speakers") {
+                SpeakerCenter.shared.identifySpeakers(in: entry)
+            }
+        }
+
         Divider()
 
         Button("Move to Trash") {

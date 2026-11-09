@@ -8,9 +8,15 @@ struct GeneralSettingsTab: View {
     @State private var isCapturing = false
     @State private var monitor: Any?
     @State private var failedShortcut: String?
+    @AppStorage(SpeakerPreferences.yourNameKey) private var yourName = NSFullUserName()
 
     var body: some View {
         Form {
+            TextField("Your name", text: $yourName, prompt: Text("Me"))
+                .accessibilityIdentifier("yourName")
+            Text("Shown for what your microphone hears in new transcripts. It stays on this Mac.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
             LabeledContent("Start or stop recording") {
                 HStack {
                     Button(isCapturing ? "Type a shortcut…" : shortcut.display) {

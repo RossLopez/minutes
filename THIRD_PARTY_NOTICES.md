@@ -6,9 +6,9 @@ Minutes is free software under the GNU General Public License, version 3 or any 
 
 ### FluidAudio 0.18.2
 
-Runs the optional Parakeet engine. By the FluidInference Team, under the Apache License 2.0, printed at the end of this file. <https://github.com/FluidInference/FluidAudio>
+Runs the optional Parakeet engine and the speaker model. By the FluidInference Team, under the Apache License 2.0, printed at the end of this file. <https://github.com/FluidInference/FluidAudio>
 
-Minutes builds it with its optional traits off, so its text-to-speech code, its NemoTextProcessing library and its LuxTTS lexicon aren't part of the app.
+Minutes builds it with only its `Diarizer` trait on, so its text-to-speech code, its NemoTextProcessing library and its LuxTTS lexicon aren't part of the app.
 
 ### fastcluster
 
@@ -28,10 +28,20 @@ THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 
 ## Downloaded when you ask
 
-Parakeet's models aren't in the app. Settings → Transcription downloads them from Hugging Face into `~/Minutes/Models` when you click Download.
+These models aren't in the app. Settings → Transcription downloads them from Hugging Face into `~/Minutes/Models` when you click Download.
 
 - **Parakeet TDT 0.6b v2**, by NVIDIA, under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). <https://huggingface.co/nvidia/parakeet-tdt-0.6b-v2>. Converted to Core ML by FluidInference: <https://huggingface.co/FluidInference/parakeet-tdt-0.6b-v2-coreml>
 - **Parakeet CTC 110M**, by NVIDIA, under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). Converted to Core ML by FluidInference: <https://huggingface.co/FluidInference/parakeet-ctc-110m-coreml>
+
+- **Speaker diarization, Community-1** (Segmentation, FBank, Embedding, PLDA and PldaRho models, `plda-parameters.json` and `xvector-transform.json`), from <https://huggingface.co/FluidInference/speaker-diarization-coreml>, under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). These files are modified Core ML conversions by Fluid Inference of:
+  - the **pyannote** speaker-diarization-community-1 pipeline, <https://huggingface.co/pyannote/speaker-diarization-community-1>
+  - the **WeSpeaker** speaker embedding model
+  - PLDA parameters by **BUT Speech@FIT**, Brno University of Technology, <https://huggingface.co/BUT-FIT/diarizen-wavlm-large-s80-md>
+
+  The model card asks that these papers be cited:
+  - Alexis Plaquet and Hervé Bredin, "Powerset multi-class cross entropy loss for neural speaker diarization", INTERSPEECH 2023.
+  - Hongji Wang et al., "Wespeaker: A research and production oriented speaker embedding learning toolkit", ICASSP 2023.
+  - Federico Landini, Ján Profant, Mireia Diez and Lukáš Burget, "Bayesian HMM clustering of x-vector sequences (VBx) in speaker diarization", Computer Speech & Language, 2022.
 
 ## Apache License 2.0
 

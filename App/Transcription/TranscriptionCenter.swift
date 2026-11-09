@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import Foundation
-import MinutesParakeet
+import MinutesDiarization
+import MinutesFluidAudio
 import MinutesPipeline
 import MinutesStorage
 import MinutesTranscription
@@ -57,6 +58,7 @@ final class TranscriptionCenter {
 
     let queue: ProcessingQueue
     let engines: [any TranscriptionEngine]
+    let diarizer: any SpeakerDiarizer
     private(set) var preferredEngineID = TranscriptionPreferences.engineID
     private(set) var modelStatuses: [String: TranscriptionModelStatus] = [:]
     /// The engine whose model is downloading.
@@ -69,7 +71,9 @@ final class TranscriptionCenter {
     private init() {
         let current = LibraryStore.shared.currentLibrary
         let engines = Self.makeEngines(current: current)
+        let diarizer = Self.makeDiarizer(current: current)
         self.engines = engines
+        self.diarizer = diarizer
         queue = ProcessingQueue(pipeline: MeetingPipeline(
             engineWithID: { id in
                 engines.first { $0.id == id } ?? engines.first { $0.id == Self.fakeEngineID }
@@ -84,6 +88,13 @@ final class TranscriptionCenter {
                     Self.logger.error("Vocabulary unreadable: \(String(describing: type(of: error)), privacy: .public)")
                     return []
                 }
+            },
+            diarizer: { diarizer },
+            speakerMemory: {
+                SpeakerPreferences.remembersVoices ? current.value.speakerProfiles : nil
+            },
+            yourName: {
+                SpeakerPreferences.yourName
             },
         ))
         queue.onChange = { _ in
@@ -103,6 +114,15 @@ final class TranscriptionCenter {
             }
         #endif
         return [AppleSpeechEngine(), ParakeetEngine { current.value.modelsFolder }]
+    }
+
+    private static func makeDiarizer(current: CurrentLibrary) -> any SpeakerDiarizer {
+        #if DEBUG
+            if ProcessInfo.processInfo.environment["MINUTES_FAKE_DIARIZATION"] == "1" {
+                return FakeDiarizer()
+            }
+        #endif
+        return FluidDiarizer { current.value.modelsFolder }
     }
 
     /// Whether moving the library now would pull files out from under something.

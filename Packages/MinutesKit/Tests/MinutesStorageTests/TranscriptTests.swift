@@ -50,7 +50,7 @@ private func segment(_ speaker: String, _ text: String, at start: Double) -> Tra
         createdAt: Date(timeIntervalSince1970: 1_800_000_000),
         segments: [segment(Transcript.Speaker.me, "Hello there", at: 2)],
     )
-    try folder.save(transcript, title: "Sync", startedAt: Date())
+    try folder.save(transcript, for: folder.loadMetadata())
     #expect(try folder.loadTranscript() == transcript)
     #expect(FileManager.default.fileExists(atPath: folder.transcriptMarkdown.path))
 }
@@ -59,8 +59,7 @@ private func segment(_ speaker: String, _ text: String, at start: Double) -> Tra
     let folder = try makeMeeting(in: makeLibrary())
     try folder.save(
         Transcript(engine: "apple", model: "m", segments: [segment(Transcript.Speaker.others, "Hi", at: 1.25)]),
-        title: "Sync",
-        startedAt: Date(),
+        for: folder.loadMetadata(),
     )
     let text = try String(contentsOf: folder.transcriptJSON, encoding: .utf8)
     #expect(text.contains("\"speaker\" : \"others\""))
@@ -81,7 +80,7 @@ private func segment(_ speaker: String, _ text: String, at start: Double) -> Tra
 @Test func `renaming a meeting updates the title in its readable transcript`() throws {
     let library = try makeLibrary()
     let folder = try makeMeeting(in: library)
-    try folder.save(Transcript(engine: "apple", model: "m", segments: []), title: "Recording", startedAt: Date())
+    try folder.save(Transcript(engine: "apple", model: "m", segments: []), for: folder.loadMetadata())
     let renamed = try library.rename(folder, to: "Budget")
     let text = try String(contentsOf: renamed.transcriptMarkdown, encoding: .utf8)
     #expect(text.hasPrefix("# Budget\n"))
