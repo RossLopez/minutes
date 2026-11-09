@@ -47,6 +47,13 @@ struct MeetingCommands: Commands {
             }
             .disabled(transcribeEntry.flatMap(center.transcribeTitle) == nil)
 
+            Button("Identify Speakers") {
+                if let transcribeEntry {
+                    SpeakerCenter.shared.identifySpeakers(in: transcribeEntry)
+                }
+            }
+            .disabled(transcribeEntry.map(SpeakerCenter.shared.canIdentifySpeakers) != true)
+
             Button("Move to Trash") {
                 if let entry = store.selectedEntry {
                     Task {

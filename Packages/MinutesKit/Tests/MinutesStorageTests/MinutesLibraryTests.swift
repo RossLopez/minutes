@@ -98,7 +98,7 @@ func `titles become safe names`(title: String, expected: String) {
 
     let text = try String(contentsOf: folder.metadataURL, encoding: .utf8)
     #expect(text.contains("\n"))
-    #expect(text.contains("\"schemaVersion\" : 1"))
+    #expect(text.contains("\"schemaVersion\" : \(MeetingMetadata.currentSchemaVersion)"))
     #expect(text.contains("\"state\" : \"recording\""))
 }
 

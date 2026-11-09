@@ -93,6 +93,7 @@ struct TranscriptStatusView: View {
         case .cleanMic: "Removing speaker echo from your microphone"
         case .transcribeMic: "Transcribing your microphone"
         case .transcribeSystem: "Transcribing system audio"
+        case .diarizeSystem: "Telling speakers apart"
         case .merge: "Putting the transcript together"
         }
         return "Step \(number) of \(steps.count): \(name)"

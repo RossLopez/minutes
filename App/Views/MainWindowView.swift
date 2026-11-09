@@ -98,7 +98,12 @@ struct MainWindowView: View {
                 consentNoteShown = true
             }
         } message: {
-            Text("Some places require everyone's consent to record a conversation. Getting it is up to you.")
+            Text(
+                """
+                Some places require everyone's consent to record a conversation. Getting it is up to you. \
+                If you turn on Remember voices, the same goes for saving the voices of the people you name.
+                """,
+            )
         }
         .frame(minWidth: 800, minHeight: 500)
     }

@@ -30,6 +30,18 @@ public enum TranscriptAssembler {
         return segments
     }
 
+    /// Like `segments(from:speaker:)`, with one speaker per word, and a new line wherever the speaker changes.
+    public static func segments(from words: [TranscriptWord], speakers: [String]) -> [TranscriptSegment] {
+        precondition(words.count == speakers.count, "One speaker per word")
+        var segments: [TranscriptSegment] = []
+        var start = 0
+        for index in words.indices where index == words.count - 1 || speakers[index + 1] != speakers[index] {
+            segments += Self.segments(from: Array(words[start ... index]), speaker: speakers[index])
+            start = index + 1
+        }
+        return segments
+    }
+
     /// Orders lines from both tracks by when they start. Lines that overlap each stay whole, one
     /// after the other, because splitting someone's sentence around a "yeah" is harder to read.
     public static func merge(_ tracks: [TranscriptSegment]...) -> [TranscriptSegment] {

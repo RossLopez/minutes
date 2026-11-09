@@ -14,6 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             await LibraryStore.shared.refresh()
             await RecordingController.shared.recoverUnfinishedMeetings()
             TranscriptionCenter.shared.queue.resumeInterrupted(in: LibraryStore.shared.library)
+            await SpeakerCenter.shared.refresh()
         }
     }
 

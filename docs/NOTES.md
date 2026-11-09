@@ -145,6 +145,52 @@ Parakeet with a vocabulary list peaked at 797 MB on 4 hours when measured throug
 
 **Logs:** a search of the app's log and console output for phrases from these transcripts found none.
 
+## Milestone 4 measurements (Nov 8, 2026)
+
+On the M5 Pro with 24 GB, release build, through `minutes-diarizecheck` with FluidAudio 0.18.2's offline pyannote Community-1 pipeline. The audio is AMI's ES2004 meetings (Mix-Headset, CC BY 4.0), the same four people in four meetings, re-encoded to the system track's format: 48 kHz mono AAC at 96 kbps. The reference labels and scoring regions are pyannote's AMI-diarization-setup (`only_words`). Scored at 10 ms with the best one-to-one speaker mapping, overlapped speech included. Times are at batch 32 for single meetings and batch 8 for 4 hours.
+
+| Meeting | Length | Speaker error | Missed | False alarm | Confused | With 0.25 s collar | Overlapped speech | Speakers found | Time |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| ES2004a | 17 min | 23.9% | 20.3% | 1.9% | 1.6% | 14.4% | 15.8% | 4 of 4 | 4.4 s |
+| ES2004b | 39 min | 16.6% | 12.6% | 2.4% | 1.6% | 8.4% | 10.1% | 4 of 4 | 8.3 s |
+| ES2004c | 39 min | 17.3% | 12.2% | 3.4% | 1.6% | 9.2% | 10.7% | 4 of 4 | 8.5 s |
+| ES2004d | 37 min | 25.9% | 18.3% | 3.4% | 4.2% | 15.6% | 15.1% | 4 of 4 | 7.8 s |
+| All four, twice over | 4.1 h | 20.4% | 14.8% | 2.9% | 2.7% | 11.3% | 12.0% | 5 of 4 | 73 s |
+
+- **Most of the error is overlap.** Minutes asks for one speaker at a time (`exclusiveSegments`), so each word has one owner, and the second voice in overlapped speech always counts as missed. Words go to the wrong person only for the "Confused" share, 1.6–4.2%.
+- **FluidAudio's published 15% on AMI** sits between the strict and 0.25 s collar figures here. Its scoring setup isn't stated.
+- **The fifth speaker on 4 hours** has 1.1 minutes of the 204 spoken: a stray split that the merge action fixes.
+
+**Memory and batch size,** as peak footprint (Activity Monitor's figure). The resident size is no use here: it counts the mapped 16 kHz audio, 0.9 GB for 4 hours, which the system can drop at any time.
+
+| | Batch 32 (FluidAudio's default) | Batch 8 |
+| --- | --- | --- |
+| ES2004b, 39 min | 979 MB, 8.2 s | 650 MB, 10.6 s |
+| 4.1 hours | 1,444 MB, 60 s | 1,008 MB, 73 s |
+| Output | Identical turns | Identical turns |
+
+The plan expected about 400 MB at batch 32 and 100 MB at batch 8, from FluidAudio's per-window figure. The rest grows with the length of the meeting. Minutes uses batch 8. The diarizer runs alone after transcription, so the pipeline's peak is the larger of the two steps, not their sum.
+
+**Voice matching across meetings.** Each speaker in ES2004a was re-measured from all their turns (`embedSpans`), as the app will do when someone is named with memory on. The speakers in b, c and d were then compared with those four profiles by cosine similarity:
+
+| | Pairs | Lowest | Median | Highest |
+| --- | --- | --- | --- | --- |
+| Same person | 12 | 0.777 | 0.929 | 0.973 |
+| Different people | 36 | -0.069 | 0.091 | 0.387 |
+
+Every speaker's best match was the right person, at least 0.42 ahead of the next. The embedding the diarizer returns and a re-measured one for the same speaker agree within 0.03, so matching can use the diarizer's without measuring again. The highest score between different people, 0.387, is the two women.
+
+**Cutoffs chosen:** a name is applied at 0.70 or above when it's also at least 0.15 ahead of the next profile, suggested from 0.50 to 0.70, and nothing is shown below 0.50. That leaves room on both sides of what was measured, since real calls use different microphones and compression. These come from four voices on one recording setup, so they are a starting point, not a tuned value.
+
+**Through the app, recorded live.** ES2004a (17.5 min) was played through the MacBook Pro's speakers with `afplay` while the Debug app recorded, with Apple Speech as the engine and the speaker model installed. Processing finished 55 s after Stop. The system track lined up with the source at a 5.44 s offset with an envelope correlation of 0.984, so capture adds almost nothing. Each system word was compared with the reference speaker at its midpoint, counting only words where exactly one person was talking:
+
+| | Speakers found | Words | Given to the right speaker |
+| --- | --- | --- | --- |
+| Recorded through the Mac | 4 of 4 | 1,811 | 97.7% |
+| Same words, diarized from the original file | 4 of 4 | 1,811 | 97.9% |
+
+Most of the misses are short words at turn changes. With no headphones, two mic lines in 17 minutes repeated what the speakers played: the mic leak that Milestone 2 measured, not a diarization error.
+
 ## Apple API notes
 
 Measurements are from a MacBook Pro on macOS 27.0.1 with a quiet test tone played by `afplay`, unless a note says otherwise.
@@ -337,3 +383,18 @@ Reproduced on an M5 Pro with every core kept busy:
 It isn't Swift's shared threads running out. 36 readers on a one-thread pool (`LIBDISPATCH_COOPERATIVE_POOL_STRICT=1`) finish when the CPU is free.
 
 **Workaround:** the tests render one at a time through `RenderGate` in `PlaybackTests.swift`, and `many renders at once all finish` guards it. The app doesn't read compositions this way: playback uses `AVPlayer`. Any future code that reads several compositions at once should do the same. CI also runs the unit tests through `scripts/test-with-watchdog.sh`, which prints a stack sample if they run past 15 minutes.
+
+### Xcode keeps a package's old traits after `Package.swift` changes them (Nov 8, 2026)
+
+Milestone 4 changed MinutesKit's FluidAudio dependency from `traits: []` to `traits: ["Diarizer"]`. `swift build` picked up the change. Xcode 27.2, building into the existing `build/` folder, still compiled FluidAudio with no `-DDiarizer` and failed with "cannot find type 'OfflineDiarizerManager'". `xcodebuild -resolvePackageDependencies` and removing FluidAudio's intermediates didn't help.
+
+**Workaround:** delete `build/Build/Intermediates.noindex/XCBuildData/PIFCache` after changing a package's traits, or build into a new `-derivedDataPath`. CI starts from an empty `build/` every run, so it isn't affected.
+
+### FluidAudio's diarizer folder and loader (Nov 8, 2026)
+
+These are FluidAudio 0.18.2 details rather than Apple's, kept here so the next upgrade checks them:
+
+- `ModelHub.download(.diarizer, to: dir, variant: "offline")` writes to `dir/speaker-diarization` (`Repo.diarizer.folderName`), not to the Hugging Face repo name `speaker-diarization-coreml`.
+- `OfflineDiarizerModels.load(from:)` takes the parent folder and adds `speaker-diarization` itself.
+- Loading never deletes or re-downloads while `ModelHub.offlineMode` is on. Minutes keeps it on except during a download the user starts, so `prepareModels`, which does purge and re-download, is never called.
+- Its logging goes through `AppLogger`, which hands each message to `os.Logger` as one interpolated string, so the unified log redacts it as private unless a profile says otherwise. The diarizer's messages hold the models folder path, timings and counts. Minutes passes it audio samples, never a meeting's path, so no title reaches them. The segmentation and embedding stages also write `[Profiling]` timing lines to stdout, which a GUI app's launchd discards.

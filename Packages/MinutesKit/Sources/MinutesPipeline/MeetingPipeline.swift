@@ -2,6 +2,7 @@
 
 import Foundation
 import MinutesAudio
+import MinutesDiarization
 import MinutesStorage
 import MinutesTranscription
 import os
@@ -25,7 +26,8 @@ public enum PipelineResult: Equatable, Sendable {
     case failed(String)
 }
 
-/// Stop → clean mic → transcribe mic → transcribe system → merge → `transcript.json` and `transcript.md`.
+/// Stop → clean mic → transcribe mic → transcribe system → diarize system → merge → `transcript.json`
+/// and `transcript.md`.
 ///
 /// After each step, `meeting.json` records that it finished, so a quit or crash resumes from
 /// there. Resuming restarts an interrupted step rather than picking up mid-way. Work in progress
@@ -39,13 +41,20 @@ public struct MeetingPipeline: Sendable {
         _ progress: @escaping @Sendable (Double) -> Void,
     ) async throws -> MicCleaner.Outcome
 
-    private static let logger = Logger(subsystem: "io.github.rosslopez.minutes", category: "pipeline")
+    static let logger = Logger(subsystem: "io.github.rosslopez.minutes", category: "pipeline")
 
     private let cleanMic: Cleaner
     private let engineWithID: @Sendable (String) -> (any TranscriptionEngine)?
     private let preferredEngineID: @Sendable () -> String
-    private let vocabulary: @Sendable () -> [VocabularyEntry]
+    let vocabulary: @Sendable () -> [VocabularyEntry]
+    let diarizer: @Sendable () -> (any SpeakerDiarizer)?
+    let speakerMemory: @Sendable () -> SpeakerProfileStore?
+    let yourName: @Sendable () -> String?
 
+    /// - Parameters:
+    ///   - diarizer: Tells the other voices apart. With none, or no model, they stay as Others.
+    ///   - speakerMemory: Saved voices to name people by, or `nil` with speaker memory off.
+    ///   - yourName: The name for Me.
     public init(
         cleanMic: @escaping Cleaner = { mic, system, output, format, progress in
             try await MicCleaner.clean(mic: mic, system: system, output: output, format: format, progress: progress)
@@ -53,11 +62,17 @@ public struct MeetingPipeline: Sendable {
         engineWithID: @escaping @Sendable (String) -> (any TranscriptionEngine)?,
         preferredEngineID: @escaping @Sendable () -> String,
         vocabulary: @escaping @Sendable () -> [VocabularyEntry],
+        diarizer: @escaping @Sendable () -> (any SpeakerDiarizer)? = { nil },
+        speakerMemory: @escaping @Sendable () -> SpeakerProfileStore? = { nil },
+        yourName: @escaping @Sendable () -> String? = { nil },
     ) {
         self.cleanMic = cleanMic
         self.engineWithID = engineWithID
         self.preferredEngineID = preferredEngineID
         self.vocabulary = vocabulary
+        self.diarizer = diarizer
+        self.speakerMemory = speakerMemory
+        self.yourName = yourName
     }
 
     /// Runs whatever's left to do. Throws only `CancellationError`, leaving the meeting ready to resume.
@@ -152,6 +167,8 @@ public struct MeetingPipeline: Sendable {
             return manager.fileExists(atPath: Self.wordsFile(.transcribeMic, in: folder).path)
         case .transcribeSystem:
             return manager.fileExists(atPath: Self.wordsFile(.transcribeSystem, in: folder).path)
+        case .diarizeSystem:
+            return manager.fileExists(atPath: Self.wordsFile(.diarizeSystem, in: folder).path)
         case .merge:
             return manager.fileExists(atPath: folder.transcriptJSON.path)
         }
@@ -181,7 +198,7 @@ public struct MeetingPipeline: Sendable {
 
 extension MeetingPipeline {
     /// What a step works with. `folder` is where it was when the step began.
-    private struct StepContext {
+    struct StepContext {
         let folder: MeetingFolder
         let location: MeetingLocation
         let engine: any TranscriptionEngine
@@ -196,6 +213,8 @@ extension MeetingPipeline {
             try await performTranscription(step, audio: context.folder.playbackMicAudio, context)
         case .transcribeSystem:
             try await performTranscription(step, audio: context.folder.systemAudio, context)
+        case .diarizeSystem:
+            try await performDiarization(context)
         case .merge:
             try performMerge(location: context.location, engine: context.engine)
         }
@@ -279,30 +298,6 @@ extension MeetingPipeline {
         }
     }
 
-    private func performMerge(location: MeetingLocation, engine: any TranscriptionEngine) throws {
-        let replacer = VocabularyReplacer(entries: vocabulary())
-        try location.access { folder in
-            let mine = try Self.loadWords(.transcribeMic, in: folder)
-            let theirs = try Self.loadWords(.transcribeSystem, in: folder)
-            let metadata = try folder.loadMetadata()
-            try folder.save(
-                Transcript(
-                    engine: engine.id,
-                    model: engine.modelName,
-                    segments: TranscriptAssembler.merge(
-                        TranscriptAssembler.segments(from: replacer.apply(to: mine), speaker: Transcript.Speaker.me),
-                        TranscriptAssembler.segments(
-                            from: replacer.apply(to: theirs),
-                            speaker: Transcript.Speaker.others,
-                        ),
-                    ),
-                ),
-                title: metadata.title,
-                startedAt: metadata.startedAt,
-            )
-        }
-    }
-
     private func finish(at location: MeetingLocation) throws {
         try location.access { folder in
             try folder.updateMetadata { metadata in
@@ -322,11 +317,11 @@ extension MeetingPipeline {
         }
     }
 
-    private static func wordsFile(_ step: ProcessingStep, in folder: MeetingFolder) -> URL {
+    static func wordsFile(_ step: ProcessingStep, in folder: MeetingFolder) -> URL {
         folder.processingFolder.appendingPathComponent("\(step.rawValue).json")
     }
 
-    private static func loadWords(_ step: ProcessingStep, in folder: MeetingFolder) throws -> [TranscriptWord] {
+    static func loadWords(_ step: ProcessingStep, in folder: MeetingFolder) throws -> [TranscriptWord] {
         try JSONDecoder().decode([TranscriptWord].self, from: Data(contentsOf: wordsFile(step, in: folder)))
     }
 

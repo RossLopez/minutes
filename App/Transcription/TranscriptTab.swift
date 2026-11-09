@@ -6,23 +6,23 @@ import SwiftUI
 /// What a transcript looks like on screen. Words are left behind, so a long meeting stays small in memory.
 private struct TranscriptDocument: Sendable {
     struct Line: Identifiable, Equatable, Sendable {
+        /// The segment's place in `transcript.json`.
         let id: Int
+        /// The speaker's ID, like `speaker-2`. Names come from `meeting.json`.
         let speaker: String
         let start: Double
         let text: String
     }
 
     let lines: [Line]
+    /// In the order they first speak.
+    let speakers: [String]
 
     init(_ transcript: Transcript) {
         lines = transcript.segments.enumerated().map { index, segment in
-            Line(
-                id: index,
-                speaker: Transcript.displayName(forSpeaker: segment.speaker),
-                start: segment.start,
-                text: segment.text,
-            )
+            Line(id: index, speaker: segment.speaker, start: segment.start, text: segment.text)
         }
+        speakers = transcript.speakers
     }
 
     /// The latest line to start at or before a moment in the audio.
@@ -72,22 +72,48 @@ struct TranscriptTab: View {
         .shared
     }
 
-    /// Reloads when the folder moves or a run ends. An old transcript stays up during a new run.
+    private var speakers: SpeakerCenter {
+        .shared
+    }
+
+    /// Reloads when the folder moves, a run ends or speakers change. An old transcript stays up during a new run.
     private var loadKey: String {
-        "\(entry.id.path)|\(entry.metadata?.processing?.status.rawValue ?? "")"
+        "\(entry.id.path)|\(entry.metadata?.processing?.status.rawValue ?? "")|\(speakers.revisions[entry.id] ?? 0)"
+    }
+
+    private var isShowingNotice: Binding<Bool> {
+        Binding(
+            get: { speakers.notice != nil },
+            set: { isShowing in
+                if !isShowing {
+                    speakers.notice = nil
+                }
+            },
+        )
     }
 
     var body: some View {
         let status = center.status(for: entry)
         Group {
             if case let .ready(document) = load, !document.lines.isEmpty {
+                let editing = SpeakerEditing(
+                    entry: entry,
+                    labels: SpeakerLabels(speakerIDs: document.speakers, metadata: entry.metadata),
+                    isEnabled: speakers.canEdit(entry),
+                )
                 VStack(spacing: 0) {
                     if status != .idle {
                         TranscriptStatusView(entry: entry, status: status)
                             .padding(.horizontal, 20)
                             .padding(.bottom, 12)
+                    } else if editing.labels.hasUnidentifiedOthers,
+                              [.installed, .notInstalled].contains(speakers.modelStatus)
+                    {
+                        IdentifySpeakersBanner(entry: entry)
+                            .padding(.horizontal, 20)
+                            .padding(.bottom, 12)
                     }
-                    TranscriptReader(player: store.player, document: document)
+                    TranscriptReader(player: store.player, document: document, editing: editing)
                 }
             } else if status == .newerVersion {
                 newerVersion
@@ -103,6 +129,14 @@ struct TranscriptTab: View {
         .task(id: loadKey) {
             let folder = entry.folder
             load = await Task.detached { TranscriptLoad.from(folder) }.value
+        }
+        .task {
+            await speakers.refresh()
+        }
+        .alert("Speakers", isPresented: isShowingNotice) {
+            Button("OK") {}
+        } message: {
+            Text(speakers.notice ?? "")
         }
     }
 
@@ -152,10 +186,12 @@ struct TranscriptTab: View {
 private struct TranscriptReader: View {
     let player: PlayerModel
     let document: TranscriptDocument
+    let editing: SpeakerEditing
 
     var body: some View {
         TranscriptList(
             lines: document.lines,
+            editing: editing,
             currentLine: document.lineID(at: player.state.currentTime),
             isPlaying: player.state.isPlaying,
             onSelect: { player.seek(to: $0.start) },
@@ -169,6 +205,7 @@ private struct TranscriptList: View {
     private static let scrollPause = Duration.seconds(8)
 
     let lines: [TranscriptDocument.Line]
+    let editing: SpeakerEditing
     let currentLine: Int?
     let isPlaying: Bool
     let onSelect: (TranscriptDocument.Line) -> Void
@@ -188,7 +225,7 @@ private struct TranscriptList: View {
                 },
             )) {
                 ForEach(lines) { line in
-                    TranscriptRow(line: line) {
+                    TranscriptRow(line: line, editing: editing) {
                         onPlay(line)
                     }
                     .tag(line.id)
@@ -224,17 +261,39 @@ private struct TranscriptList: View {
 
 private struct TranscriptRow: View {
     let line: TranscriptDocument.Line
+    let editing: SpeakerEditing
     let onPlay: () -> Void
+
+    @State private var isNaming = false
 
     private var clock: String {
         MeetingFormatting.clock(line.start)
     }
 
+    private var label: String {
+        editing.labels.label(line.speaker)
+    }
+
+    private var canChangeSpeaker: Bool {
+        editing.isEnabled && line.speaker != Transcript.Speaker.me
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack(spacing: 8) {
-                Text(line.speaker)
-                    .font(.callout.weight(.semibold))
+                Button(label) {
+                    isNaming = true
+                }
+                .buttonStyle(.plain)
+                .font(.callout.weight(.semibold))
+                .disabled(!editing.isEnabled)
+                .help("Name this speaker")
+                .accessibilityIdentifier("speakerLabel")
+                .popover(isPresented: $isNaming, arrowEdge: .bottom) {
+                    SpeakerPopover(editing: editing, speakerID: line.speaker) {
+                        isNaming = false
+                    }
+                }
                 Text(clock)
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
@@ -246,12 +305,62 @@ private struct TranscriptRow: View {
         .contentShape(.rect)
         // Simultaneous, so a click also selects the row. It restarts a line that's already current.
         .simultaneousGesture(TapGesture().onEnded(onPlay))
+        .contextMenu {
+            contextMenu
+        }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(line.speaker), \(MeetingFormatting.spokenTime(line.start))")
+        .accessibilityLabel("\(label), \(MeetingFormatting.spokenTime(line.start))")
         .accessibilityValue(line.text)
         .accessibilityHint("Plays the audio from this moment")
         .accessibilityAddTraits(.isButton)
         .accessibilityAction(.default, onPlay)
+        .accessibilityAction(named: "Name Speaker") {
+            if editing.isEnabled {
+                isNaming = true
+            }
+        }
+        .accessibilityActions {
+            if canChangeSpeaker {
+                ForEach(editing.labels.others(than: line.speaker)) { other in
+                    Button("Change Speaker to \(other.name)") {
+                        move(to: other.id)
+                    }
+                }
+                Button("Change Speaker to New Speaker") {
+                    move(to: nil)
+                }
+            }
+        }
         .accessibilityIdentifier("transcriptLine")
+    }
+
+    @ViewBuilder
+    private var contextMenu: some View {
+        Button("Name Speaker…") {
+            isNaming = true
+        }
+        .disabled(!editing.isEnabled)
+        if line.speaker != Transcript.Speaker.me {
+            Menu("Change Speaker") {
+                ForEach(editing.labels.others(than: line.speaker)) { other in
+                    Button(other.name) {
+                        move(to: other.id)
+                    }
+                }
+                Divider()
+                Button("New Speaker") {
+                    move(to: nil)
+                }
+            }
+            .disabled(!canChangeSpeaker)
+        }
+    }
+
+    private func move(to speaker: String?) {
+        let entry = editing.entry
+        let index = line.id
+        Task {
+            await SpeakerCenter.shared.moveLine(at: index, to: speaker, in: entry)
+        }
     }
 }

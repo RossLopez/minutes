@@ -129,3 +129,13 @@ private let spoken = [word("we", 0, 1), word("use", 1, 2), word("tan", 2, 3), wo
     #expect(result[0].start == 0)
     #expect(result[4].end == 5)
 }
+
+@Test func `a new line starts where the speaker changes`() {
+    let words = [word("Hi", 0), word("there", 0.3), word("Hello", 0.6), word("again", 0.9)]
+    let segments = TranscriptAssembler.segments(
+        from: words,
+        speakers: ["speaker-1", "speaker-1", "speaker-2", "speaker-1"],
+    )
+    #expect(segments.map(\.speaker) == ["speaker-1", "speaker-2", "speaker-1"])
+    #expect(segments.map(\.text) == ["Hi there", "Hello", "again"])
+}

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-import MinutesParakeet
+import MinutesFluidAudio
 import MinutesTranscription
 import SwiftUI
 
@@ -36,6 +36,8 @@ struct TranscriptionSettingsTab: View {
             }
 
             VocabularySection()
+
+            SpeakerSettingsSection()
         }
         .formStyle(.grouped)
         .task {
