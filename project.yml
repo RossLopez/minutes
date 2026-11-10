@@ -50,6 +50,7 @@ targets:
           - MinutesTranscription
           - MinutesDiarization
           - MinutesLLM
+          - MinutesLlama
           - MinutesStorage
           - MinutesPipeline
           - MinutesFluidAudio

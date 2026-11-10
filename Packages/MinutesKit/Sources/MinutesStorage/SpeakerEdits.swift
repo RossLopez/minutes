@@ -77,7 +77,7 @@ public extension MeetingFolder {
         guard speaker != target else {
             return
         }
-        try editSpeakers { transcript, speakers in
+        try editSpeakers(mergedInto: [speaker: target]) { transcript, speakers in
             guard speaker != Transcript.Speaker.me, target != Transcript.Speaker.me else {
                 throw SpeakerEditError.cantChangeMe
             }
@@ -130,6 +130,7 @@ public extension MeetingFolder {
     /// worst a name for a speaker with no lines.
     @discardableResult
     private func editSpeakers(
+        mergedInto: [String: String] = [:],
         _ change: (inout Transcript, inout [String: MeetingMetadata.Speaker]) throws -> Void,
     ) throws -> (transcript: Transcript, metadata: MeetingMetadata) {
         try Self.metadataLock.withLock {
@@ -153,6 +154,7 @@ public extension MeetingFolder {
             let present = Set(transcript.speakers + [Transcript.Speaker.me])
             speakers = speakers.filter { present.contains($0.key) && !$0.value.isEmpty }
             metadata.speakers = speakers.isEmpty ? nil : speakers
+            followRenames(in: &metadata, present: present, mergedInto: mergedInto)
 
             if transcript != original {
                 try MeetingMetadata.encoder.encode(transcript).write(to: transcriptJSON, options: .atomic)

@@ -14,12 +14,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             await LibraryStore.shared.refresh()
             await RecordingController.shared.recoverUnfinishedMeetings()
             TranscriptionCenter.shared.queue.resumeInterrupted(in: LibraryStore.shared.library)
+            SummaryCenter.shared.updateHold()
+            SummaryCenter.shared.queue.resumeInterrupted(in: LibraryStore.shared.library)
             await SpeakerCenter.shared.refresh()
         }
     }
 
     func applicationShouldTerminate(_: NSApplication) -> NSApplication.TerminateReply {
         RecordingController.shared.handleTerminationRequest()
+    }
+
+    func applicationWillTerminate(_: Notification) {
+        SummaryCenter.shared.prepareForExit()
     }
 
     /// A recording must keep going after the main window closes, and the menu bar item must stay available.

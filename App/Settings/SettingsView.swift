@@ -22,12 +22,10 @@ struct SettingsView: View {
                         StorageSettingsTab()
                     case .transcription:
                         TranscriptionSettingsTab()
-                    case .aiModels, .summaryTemplates:
-                        ContentUnavailableView(
-                            tab.title,
-                            systemImage: tab.systemImage,
-                            description: Text(tab.stubDescription),
-                        )
+                    case .aiModels:
+                        AIModelsSettingsTab()
+                    case .summaryTemplates:
+                        SummaryTemplatesSettingsTab()
                     }
                 }
             }
@@ -75,14 +73,6 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         case .permissions: "hand.raised"
         case .storage: "internaldrive"
         case .about: "info.circle"
-        }
-    }
-
-    var stubDescription: String {
-        switch self {
-        case .aiModels: "Arrives in Milestones 5 and 6."
-        case .summaryTemplates: "Arrives in Milestone 5."
-        case .general, .recording, .transcription, .permissions, .storage, .about: ""
         }
     }
 }

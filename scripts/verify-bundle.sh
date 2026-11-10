@@ -48,6 +48,25 @@ else
     failures=$((failures + 1))
 fi
 
+llama="$app/Contents/Frameworks/llama.framework"
+if [[ -d "$llama" ]] && codesign --verify --strict "$llama" 2>/dev/null; then
+    echo "ok    llama.framework: present and signed"
+else
+    echo "FAIL  llama.framework: missing or unsigned"
+    failures=$((failures + 1))
+fi
+check "llama.framework has arm64" "yes" "$(lipo -archs "$llama/llama" 2>/dev/null | grep -qw arm64 && echo yes || echo no)"
+
+# Debug builds can swap in fake engines for UI tests. Release builds must not contain them.
+if [[ "$app" == *"/Release/"* ]]; then
+    if strings -a "$binary" | grep -qE 'MINUTES_FAKE_(TRANSCRIPTION|DIARIZATION|LLM)'; then
+        echo "FAIL  fake engines: present in a Release build"
+        failures=$((failures + 1))
+    else
+        echo "ok    fake engines: absent"
+    fi
+fi
+
 signature="$(codesign -dv "$app" 2>&1)"
 if grep -Eq 'flags=.*runtime' <<<"$signature"; then
     echo "ok    hardened runtime: on"

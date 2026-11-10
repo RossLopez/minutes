@@ -98,12 +98,14 @@ final class TranscriptionCenter {
             },
         ))
         queue.onChange = { _ in
+            SummaryCenter.shared.updateHold()
             Task {
                 await LibraryStore.shared.refresh()
             }
         }
         queue.onFinish = { folder in
             Self.notifyFinished(folder)
+            SummaryCenter.shared.transcriptFinished(folder)
         }
     }
 

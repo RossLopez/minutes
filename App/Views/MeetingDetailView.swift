@@ -8,8 +8,8 @@ struct MeetingDetailView: View {
     let store: LibraryStore
     let entry: MeetingEntry
 
-    /// Summaries don't exist until Milestone 5, so the transcript is the first useful thing to show.
-    @State private var tab = MeetingTab.transcript
+    /// The tab last chosen, for every meeting. Summary first.
+    @AppStorage("meeting.tab") private var tab = MeetingTab.summary
 
     private var state: MeetingDisplayState {
         MeetingDisplayState(entry: entry)
@@ -48,6 +48,8 @@ struct MeetingDetailView: View {
             .padding(20)
             if tab == .transcript {
                 TranscriptTab(store: store, entry: entry)
+            } else if tab == .summary {
+                SummaryTab(entry: entry)
             } else {
                 ContentUnavailableView(
                     tab.title,
@@ -235,7 +237,7 @@ private enum MeetingTab: String, CaseIterable, Identifiable {
 
     var emptyDescription: String {
         switch self {
-        case .summary: "Summaries arrive in Milestone 5."
+        case .summary: ""
         case .transcript: ""
         case .notes: "Notes arrive in Milestone 7."
         }

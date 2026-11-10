@@ -51,7 +51,9 @@ class MinutesUITestCase: XCTestCase {
     }
 
     @MainActor
-    func launch(holdingTranscription: Bool = false, diarizing: Bool = false) {
+    func launch(holdingTranscription: Bool = false, diarizing: Bool = false, summarizing: Bool = false,
+                tab: String = "transcript")
+    {
         if !holdingTranscription {
             FileManager.default.createFile(atPath: releaseFile.path, contents: nil)
         }
@@ -63,9 +65,13 @@ class MinutesUITestCase: XCTestCase {
         if diarizing {
             app.launchEnvironment["MINUTES_FAKE_DIARIZATION"] = "1"
         }
+        if summarizing {
+            app.launchEnvironment["MINUTES_FAKE_LLM"] = "1"
+        }
         // The app shares its settings with the real one, so pin the ones these tests depend on.
         app.launchArguments += ["-consentNoteShown", "YES", "-speakers.remembersVoices", "NO"]
-        app.launchArguments += ["-general.yourName", "Robin"]
+        app.launchArguments += ["-general.yourName", "Robin", "-meeting.tab", tab]
+        app.launchArguments += ["-ai.summarizeAutomatically", "YES", "-ai.defaultTemplate", "Default"]
         app.launch()
     }
 
