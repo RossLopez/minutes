@@ -62,6 +62,11 @@ private struct MeetingRow: View {
             .joined(separator: " · ")
     }
 
+    /// Transcription comes first, since a summary waits for it.
+    private var workBadge: String? {
+        TranscriptionCenter.shared.badge(for: entry) ?? SummaryCenter.shared.badge(for: entry)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(entry.title)
@@ -73,7 +78,7 @@ private struct MeetingRow: View {
                 Text(badge)
                     .font(.caption)
                     .foregroundStyle(state == .recording ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
-            } else if let badge = TranscriptionCenter.shared.badge(for: entry) {
+            } else if let badge = workBadge {
                 Text(badge)
                     .font(.caption)
                     .foregroundStyle(.secondary)

@@ -12,6 +12,17 @@ The spec originally targeted macOS 26. Ross chose to support only macOS 27, the 
 - CI runs on the `xcode-27` image, which runs macOS 27. The `macos-26` and `macos-latest` images are still on macOS 26.
 - The Homebrew cask will use `depends_on macos: ">= :golden_gate"`.
 
+### Gemma 4 QAT Q4_0 instead of Q4_K_M (Nov 9, 2026)
+
+The spec names Q4_K_M quantizations. Ross chose Google's own Gemma 4 GGUFs instead: quantization-aware trained Q4_0, from Google's Hugging Face repositories and under Apache 2.0. Google trained them for 4-bit, so they lose less than a third-party Q4_K_M made after training, and they come straight from the model's authors. Each repository also has a vision file (`mmproj`), which Minutes doesn't download.
+
+### Minutes writes Gemma 4's conversation format (Nov 9, 2026)
+
+The plan was to format prompts with the GGUF's template through `llama_chat_apply_template`. That function only knows llama.cpp's built-in formats, it has no Jinja engine, and b12110 doesn't have Gemma 4's `<|turn>role … <turn|>` format. So `ChatFormat` in MinutesLlama writes it for any template that uses those markers, matching the template's output with thinking off and no tools. Other models still go through `llama_chat_apply_template`.
+
+- **Thinking stays off.** The template adds `<|think|>` only when asked to, so Minutes' prompts have none, and on E2B the answers came back with no thought channel.
+- **Meeting text is never read as control tokens.** The format's markers are tokenized with special tokens on and message text with them off, so a transcript line that says `<turn|>` can't end its turn. A real-model test checks this.
+
 ### Apple is the default transcription engine (Nov 6, 2026)
 
 Ross chose Apple's `SpeechTranscriber` as the default, with Parakeet TDT v2 through FluidAudio as an optional download, and left out WhisperKit. I had recommended Parakeet as the default, because it got 49 of 52 vocabulary terms against Apple's 30. `SpeechTranscriber` ignores contextual strings, so on the default engine only the replacement step after transcription helps with custom terms, and Settings says so. The numbers are in [TRANSCRIPTION_SPIKE.md](TRANSCRIPTION_SPIKE.md).
@@ -191,9 +202,40 @@ Every speaker's best match was the right person, at least 0.42 ahead of the next
 
 Most of the misses are short words at turn changes. With no headphones, two mic lines in 17 minutes repeated what the speakers played: the mic leak that Milestone 2 measured, not a diarization error.
 
+## Milestone 5 measurements (Nov 9, 2026)
+
+On the M5 Pro with 24 GB, with Safari, Xcode and other apps open, through a release build of `minutes-llmcheck` with llama.cpp b12110, every layer on Metal, a 32K context and `swa_full` off. The transcripts are AMI ES2004a–d as Minutes transcribed them with Apple Speech, with the four speakers named. "Two hours" is all four joined, 1,095 lines, which needs two parts and a combining step.
+
+| Model | Load | Writing speed | 17-minute meeting | Two hours | Footprint | Resident with mapped weights |
+| --- | --- | --- | --- | --- | --- | --- |
+| E2B | 0.3 s | 124 tokens/s | 4 s | 25 s | 0.5 GB | 3.9 GB |
+| E4B | 0.4 s | 71 tokens/s | 5 s | 45 s | 0.9 GB | 6.1 GB |
+| 12B | 0.6 s | 31 tokens/s | 18 s | 128 s | 1.4 GB | 8.3 GB |
+
+- **Load** is from the second run on, with the file in the page cache. The first load of the 12B after download took 10.5 s.
+- **Footprint** is Activity Monitor's figure. The weights are mapped from the file, so the system can drop them under pressure, but a summary runs at full speed only while they stay in memory. That is why each model's recommended memory is about twice its file.
+- **Before `swa_full` was turned off,** the 12B's footprint at 32K was 11.5 GB, and E2B's and E4B's were 1.0 and 2.2 GB. The output is the same either way.
+
+**Quality,** read by hand against the transcripts:
+
+- **12B** is clearly best. It is the only one to get the production cost right (€12.50), and on two hours it covers all four meetings, labels decisions only where the group settled something, and names owners for action items. On two hours it put the owner after the task instead of before it.
+- **E4B** follows the format and covers all four meetings, but repeats some decisions and starts the two-hour summary with its own title.
+- **E2B** uses a top-level heading for Overview, lists owners for tasks nobody took on, and on two hours mostly describes the last meeting.
+- **None invented names or numbers.** Odd figures, such as a production cost of "1250", are what Apple Speech heard.
+
+**Choices from this:** a 32K context for every model, temperature 0.3 and top-p 0.95, with the 12B as the default and E4B for Macs with less than 16 GB.
+
+**Through the app:** the Debug app summarized ES2004a with E2B in about 5 s, streaming into the Summary tab. Quitting mid-summary exited cleanly, and the summary restarted and finished at the next launch. E4B and 12B were downloaded through the app. The 12B download was paused by quitting at 1.1 GB and resumed after relaunch, and both checksums matched Hugging Face's.
+
+**Privacy:** while a summary ran, the app's only network connections were the two of a model download in progress, to Hugging Face. Its logs held no transcript, template or summary text.
+
 ## Apple API notes
 
 Measurements are from a MacBook Pro on macOS 27.0.1 with a quiet test tone played by `afplay`, unless a note says otherwise.
+
+### A `.task` on a view that draws nothing never runs (Nov 9, 2026)
+
+When every branch of a `Group` or `switch` produces nothing, as an `EmptyView` does, the modifiers attached to it never appear, so its `.task` and `.onAppear` don't run. The Summary tab loaded `summary.md` in a `.task` on such a switch, and a finished summary showed nothing until a summary was written in the same session. The tab now sits on a `Color.clear`, which is always drawn, and a UI test relaunches the app and checks that a saved summary shows.
 
 ### `SpeechTranscriber` ignores contextual strings (Nov 6, 2026)
 
@@ -398,3 +440,15 @@ These are FluidAudio 0.18.2 details rather than Apple's, kept here so the next u
 - `OfflineDiarizerModels.load(from:)` takes the parent folder and adds `speaker-diarization` itself.
 - Loading never deletes or re-downloads while `ModelHub.offlineMode` is on. Minutes keeps it on except during a download the user starts, so `prepareModels`, which does purge and re-download, is never called.
 - Its logging goes through `AppLogger`, which hands each message to `os.Logger` as one interpolated string, so the unified log redacts it as private unless a profile says otherwise. The diarizer's messages hold the models folder path, timings and counts. Minutes passes it audio samples, never a meeting's path, so no title reaches them. The segmentation and embedding stages also write `[Profiling]` timing lines to stdout, which a GUI app's launchd discards.
+
+### llama.cpp b12110 (Nov 9, 2026)
+
+These are llama.cpp's rather than Apple's, kept here so the next upgrade checks them:
+
+- **Exiting with a model loaded crashes.** ggml's Metal device is freed by a static destructor, and it asserts (`GGML_ASSERT([rsets->data count] == 0)`) if a model or context still holds residency sets. `minutes-llmcheck` unloads before it exits, and the app unloads before it quits.
+- **Set the log callback before `llama_backend_init`.** Metal's start-up messages are written during init, so a callback set afterwards misses them and they go to standard error.
+- **Gemma 4 has no separate end-of-turn token.** `llama_vocab_eot` returns -1. `<turn|>` is a control token that `llama_vocab_is_eog` does count, so generation stops there.
+- **The xcframework carries llama.cpp's multimodal library,** with stb_image and part of miniaudio, though Minutes doesn't call it. Their notices are in THIRD_PARTY_NOTICES.
+- **Downloads redirect.** `huggingface.co/<repo>/resolve/<commit>/<file>` answers with a 302 to Hugging Face's CDN, such as `us.aws.cdn.hf.co`. URLSession keeps the `Range` header through the redirect and gets a 206.
+- **The sliding-window cache defaults to full size.** `llama_context_default_params` sets `swa_full`, so Gemma's sliding-window layers, most of the model, keep cache for the whole context. On the 12B at 32K that made the footprint 11.5 GB. With other apps open, this 24 GB Mac swapped, wrote at 2 tokens/s, and the 2-hour summary failed with `llama_decode` error -3. Minutes clears the cache before each prompt and runs one conversation at a time, so it sets `swa_full = false`. The 12B then needs 1.3 GB beside its mapped weights.
+- **Gemma 4 templates differ between sizes.** With thinking off, the 12B's template ends the prompt with an empty thought block, `<|channel>thought\n<channel|>`, and E2B's and E4B's don't. Without it the 12B writes that block at the start of every answer, as plain text. `ChatFormat` adds the block when the template has it, and the real-model test checks that no marker reaches the summary.

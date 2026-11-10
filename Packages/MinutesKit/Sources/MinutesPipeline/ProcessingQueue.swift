@@ -47,7 +47,7 @@ public final class ProcessingQueue {
     @ObservationIgnored private let pipeline: MeetingPipeline
     @ObservationIgnored private var job: Job?
     @ObservationIgnored private var stopReason: StopReason?
-    @ObservationIgnored private var sleepAssertion: any NSObjectProtocol?
+    @ObservationIgnored private let keepAwake = KeepAwake(reason: "Transcribing a meeting")
 
     public init(pipeline: MeetingPipeline) {
         self.pipeline = pipeline
@@ -201,11 +201,11 @@ public final class ProcessingQueue {
             return
         }
         guard !waiting.isEmpty else {
-            allowSleep()
+            keepAwake.end()
             return
         }
         let next = waiting.removeFirst()
-        preventSleep()
+        keepAwake.begin()
         let location = MeetingLocation(folder: MeetingFolder(url: next.folder))
         activity = Activity(folder: next.folder)
         stopReason = nil
@@ -255,7 +255,7 @@ public final class ProcessingQueue {
         onChange(folder.url)
         advance()
         if isPaused {
-            allowSleep()
+            keepAwake.end()
         }
     }
 
@@ -263,23 +263,5 @@ public final class ProcessingQueue {
         try? folder.updateMetadata { metadata in
             metadata.processing?.status = .stopped
         }
-    }
-
-    /// Keeps the Mac from idle-sleeping while there's work. A closed lid still sleeps it.
-    private func preventSleep() {
-        guard sleepAssertion == nil else {
-            return
-        }
-        sleepAssertion = ProcessInfo.processInfo.beginActivity(
-            options: [.idleSystemSleepDisabled, .suddenTerminationDisabled],
-            reason: "Transcribing a meeting",
-        )
-    }
-
-    private func allowSleep() {
-        if let sleepAssertion {
-            ProcessInfo.processInfo.endActivity(sleepAssertion)
-        }
-        sleepAssertion = nil
     }
 }

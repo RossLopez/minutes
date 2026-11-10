@@ -33,13 +33,14 @@
             while !FileManager.default.fileExists(atPath: releaseFile.path) {
                 try await Task.sleep(for: .milliseconds(50))
             }
+            // One line per track, with enough words between them to summarize.
             return audio.lastPathComponent == "system.m4a"
-                ? Self.words(["Sounds", "good", "to", "me."], from: 60)
-                : Self.words(["Let's", "start", "the", "review."], from: 10)
+                ? Self.words("Sounds good to me. I will send the updated numbers on Thursday.", from: 60)
+                : Self.words("Let's start the review. We need to agree the budget before Friday.", from: 10)
         }
 
-        private static func words(_ texts: [String], from start: Double) -> [TranscriptWord] {
-            texts.enumerated().map { index, text in
+        private static func words(_ line: String, from start: Double) -> [TranscriptWord] {
+            line.split(separator: " ").map(String.init).enumerated().map { index, text in
                 let wordStart = start + Double(index) * 0.5
                 return TranscriptWord(text: text, start: wordStart, end: wordStart + 0.4)
             }

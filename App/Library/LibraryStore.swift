@@ -179,9 +179,11 @@ final class LibraryStore {
         let wasPlayerOpen = player.loadedFolder == entry.id
         let position = player.state
         do {
-            // Through the queue, so a job running on this meeting follows its folder.
+            // Through the queues, so a job running on this meeting follows its folder.
             let library = library
-            let renamed = try TranscriptionCenter.shared.queue.move(entry.id) { try library.rename($0, to: title) }
+            let renamed = try SummaryCenter.shared.queue.move(entry.id) { folder in
+                try TranscriptionCenter.shared.queue.move(folder.url) { try library.rename($0, to: title) }
+            }
             RecordingController.shared.folderMoved(from: entry.id, to: renamed.url)
             if selection == entry.id {
                 selection = renamed.url
@@ -214,7 +216,10 @@ final class LibraryStore {
         }
         let queue = TranscriptionCenter.shared.queue
         let wasQueued = queue.activity?.folder == entry.id || queue.isWaiting(entry.id)
+        let summaries = SummaryCenter.shared.queue
+        let wasSummarizing = summaries.activity?.folder == entry.id || summaries.isWaiting(entry.id)
         await queue.remove(entry.id)
+        await summaries.remove(entry.id)
         do {
             if let trashFolderForTests {
                 try FileManager.default.createDirectory(at: trashFolderForTests, withIntermediateDirectories: true)
@@ -238,24 +243,14 @@ final class LibraryStore {
             if wasQueued {
                 queue.enqueue(entry.id)
             }
+            if wasSummarizing {
+                summaries.enqueue(entry.id)
+            }
             RecordingAlerts.show(
                 title: "Minutes Couldn't Move This Meeting to the Trash",
                 message: "It's still in your library. You can try moving its folder in Finder.",
             )
         }
-    }
-
-    func reveal(_ entry: MeetingEntry) {
-        NSWorkspace.shared.activateFileViewerSelecting([entry.id])
-    }
-
-    func revealLibrary() {
-        NSWorkspace.shared.activateFileViewerSelecting([library.root])
-    }
-
-    func openTrash() {
-        let trash = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".Trash")
-        NSWorkspace.shared.open(trash)
     }
 
     /// The meeting to select once this one is gone: the next one down, or else the one above.
@@ -306,6 +301,7 @@ extension LibraryStore {
         selection = nil
         await refresh()
         TranscriptionCenter.shared.queue.resumeInterrupted(in: library)
+        SummaryCenter.shared.libraryChanged()
     }
 
     func useDefaultLocation() async {
@@ -318,14 +314,17 @@ extension LibraryStore {
         selection = nil
         await refresh()
         TranscriptionCenter.shared.queue.resumeInterrupted(in: library)
+        SummaryCenter.shared.libraryChanged()
     }
 
     /// Moves the whole library into a folder the user chooses.
     func moveLibrary() async {
-        guard RecordingController.shared.phase == .idle, !TranscriptionCenter.shared.isBusy else {
+        guard RecordingController.shared.phase == .idle, !TranscriptionCenter.shared.isBusy,
+              !SummaryCenter.shared.isBusy
+        else {
             RecordingAlerts.show(
                 title: "Minutes Is Busy",
-                message: "Wait for recording, transcribing and downloads to finish, then move your library.",
+                message: "Wait for recording, transcribing, summaries and downloads to finish, then move your library.",
             )
             return
         }

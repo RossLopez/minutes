@@ -26,6 +26,22 @@ Redistribution and use in source and binary forms, with or without modification,
 
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+### llama.cpp and ggml, build b12110 (v0.9.0)
+
+Run the built-in summary models. By the ggml authors, under the MIT License. <https://github.com/ggml-org/llama.cpp>
+
+Minutes uses llama.cpp's prebuilt `llama.xcframework`, pinned by checksum. The framework also contains llama.cpp's multimodal library, which Minutes doesn't use. That library includes **stb_image** by Sean Barrett and part of **miniaudio** by David Reid, each offered under the MIT License or in the public domain. ggml's rotary-embedding code is "MIT licensed. Copyright (c) 2023 Jeffrey Quesnelle and Bowen Peng" (YaRN).
+
+MIT License
+
+Copyright (c) 2023-2026 The ggml authors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
 ## Downloaded when you ask
 
 These models aren't in the app. Settings → Transcription downloads them from Hugging Face into `~/Minutes/Models` when you click Download.
@@ -42,6 +58,8 @@ These models aren't in the app. Settings → Transcription downloads them from H
   - Alexis Plaquet and Hervé Bredin, "Powerset multi-class cross entropy loss for neural speaker diarization", INTERSPEECH 2023.
   - Hongji Wang et al., "Wespeaker: A research and production oriented speaker embedding learning toolkit", ICASSP 2023.
   - Federico Landini, Ján Profant, Mireia Diez and Lukáš Burget, "Bayesian HMM clustering of x-vector sequences (VBx) in speaker diarization", Computer Speech & Language, 2022.
+
+- **Gemma 4 summary models** (12B, E4B, E2B, 26B A4B and 31B, instruction-tuned, quantization-aware trained, Q4_0 GGUF), by Google, under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0), printed at the end of this file. Settings → AI Models downloads the one you choose from Google's repositories, such as <https://huggingface.co/google/gemma-4-12B-it-qat-q4_0-gguf>. Minutes doesn't download their vision files.
 
 ## Apache License 2.0
 

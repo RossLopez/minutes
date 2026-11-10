@@ -67,8 +67,9 @@ public struct MeetingMetadata: Codable, Equatable, Sendable {
         }
     }
 
-    /// 2 added `speakers`. A version 1 app would drop names when saving, so it opens these read-only.
-    public static let currentSchemaVersion = 2
+    /// 2 added `speakers`, and 3 added `summary`. An older app would drop them when saving, so it
+    /// opens these read-only.
+    public static let currentSchemaVersion = 3
 
     public var schemaVersion = MeetingMetadata.currentSchemaVersion
     public var id: UUID
@@ -88,6 +89,8 @@ public struct MeetingMetadata: Codable, Equatable, Sendable {
     public var processing: ProcessingState?
     /// Names for the speakers in `transcript.json`. `nil` for meetings with nobody named.
     public var speakers: [String: Speaker]?
+    /// The summary's state and where it came from. `nil` until one is wanted.
+    public var summary: Summary?
 
     public init(
         id: UUID = UUID(),

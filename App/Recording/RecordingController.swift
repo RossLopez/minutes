@@ -319,7 +319,7 @@ extension RecordingController {
         settingsRequests += 1
     }
 
-    /// Capture never competes with transcribing, and saving a recording needs the disk.
+    /// Capture never competes with transcribing or summarizing, and saving a recording needs the disk.
     private func pauseOrResumeTranscribing(after oldPhase: Phase) {
         guard (phase == .idle) != (oldPhase == .idle) else {
             return
@@ -329,6 +329,7 @@ extension RecordingController {
         } else {
             TranscriptionCenter.shared.queue.pause()
         }
+        SummaryCenter.shared.updateHold()
     }
 }
 
