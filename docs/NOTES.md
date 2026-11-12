@@ -12,6 +12,18 @@ The spec originally targeted macOS 26. Ross chose to support only macOS 27, the 
 - CI runs on the `xcode-27` image, which runs macOS 27. The `macos-26` and `macos-latest` images are still on macOS 26.
 - The Homebrew cask will use `depends_on macos: ">= :golden_gate"`.
 
+### Endpoints outside the user's network are allowed, with a warning (Nov 11, 2026)
+
+The spec allows any OpenAI-compatible endpoint, and CLAUDE.md's first principle said "local". It now matches the spec, with conditions: an endpoint whose addresses aren't loopback or private must use https, saving it asks "Send transcripts to <host>?", and it carries "Outside your network" in the pickers and a network mark beside the Summary tab's model name. The plan called that label "Off this Mac", but a server on another Mac at home is off this Mac too, and isn't the case the warning is for.
+
+### Endpoints run with thinking off (Nov 11, 2026)
+
+Minutes sends `reasoning_effort: "none"`, so a model that can think doesn't, as the built-in models don't. llama-server lets Gemma 4 think by default: E4B spent about 1,100 of 1,517 tokens on thoughts that Minutes then dropped, and ES2004a took 26 s instead of 6 s. A server that refuses the parameter with a 400 gets the request again without it, and isn't sent it again. Reasoning that still arrives, in `reasoning_content` or a leading `<think>` block, is dropped.
+
+### Endpoint token counts are estimates (Nov 11, 2026)
+
+A server doesn't share its tokenizer, so Minutes counts three ASCII characters, or one other character, as a token. Gemma measured about four characters a token in English, so parts are smaller than they need to be. On the two-hour join both runtimes still read two parts.
+
 ### Gemma 4 QAT Q4_0 instead of Q4_K_M (Nov 9, 2026)
 
 The spec names Q4_K_M quantizations. Ross chose Google's own Gemma 4 GGUFs instead: quantization-aware trained Q4_0, from Google's Hugging Face repositories and under Apache 2.0. Google trained them for 4-bit, so they lose less than a third-party Q4_K_M made after training, and they come straight from the model's authors. Each repository also has a vision file (`mmproj`), which Minutes doesn't download.
@@ -229,6 +241,22 @@ On the M5 Pro with 24 GB, with Safari, Xcode and other apps open, through a rele
 
 **Privacy:** while a summary ran, the app's only network connections were the two of a model download in progress, to Hugging Face. Its logs held no transcript, template or summary text.
 
+## Milestone 6 measurements (Nov 11, 2026)
+
+On the M5 Pro with 24 GB, release `minutes-llmcheck`, the same GGUFs through Homebrew's `llama-server` (llama.cpp 0.9.0, build 12110, the same build Minutes embeds) and through the built-in runtime, one at a time. The server ran with `-c 32768 -np 1`: without `-np 1` it splits the context between slots. The transcripts are AMI ES2004a–d from AMI's own manual transcripts with the four speakers named, rebuilt because Milestone 5's Apple Speech versions were in a cleared scratch folder. "Two hours" is all four joined, 1,833 lines.
+
+| Model | Runtime | 17-minute meeting | Two hours | Parts | Writing speed |
+| --- | --- | --- | --- | --- | --- |
+| E4B | Endpoint | 6 s | 58 s | 2 | 65 tokens/s |
+| E4B | Built-in | 8 s (1.0 s load) | 57 s | 2 | |
+| 12B | Endpoint | 25 s | 181 s | 2 | 27 tokens/s |
+| 12B | Built-in | 23 s (0.6 s load) | 178 s | 2 | |
+
+- **The same speed either way,** within a few seconds. The server read ES2004a's 6,331 prompt tokens at 3,380 tokens/s with E4B. Its resident memory with the 12B loaded was 7.9 GB, much as built-in.
+- **The same quality.** Summaries differ in wording but cover the same points, name owners for action items, and have no thought block or markers. The 12B's empty thought block comes from llama-server's own template handling, so nothing was needed for it.
+- **Errors, live:** no key and a wrong key (`--api-key`) both give "didn't accept the API key", and a context longer than the server's gives the context-length message. Test Connection reads `n_ctx` from `/v1/models`, which llama-server lists with each model.
+- **Through the app:** the Debug app added llama-server from Settings over plain http to 127.0.0.1, detected its 4,096-token context, and shows it as "On this Mac". The UI test does the rest against a stand-in server: pick its model for Summaries, record, and get a summary labelled "stub-model on Stub".
+
 ## Apple API notes
 
 Measurements are from a MacBook Pro on macOS 27.0.1 with a quiet test tone played by `afplay`, unless a note says otherwise.
@@ -236,6 +264,18 @@ Measurements are from a MacBook Pro on macOS 27.0.1 with a quiet test tone playe
 ### A `.task` on a view that draws nothing never runs (Nov 9, 2026)
 
 When every branch of a `Group` or `switch` produces nothing, as an `EmptyView` does, the modifiers attached to it never appear, so its `.task` and `.onAppear` don't run. The Summary tab loaded `summary.md` in a `.task` on such a switch, and a finished summary showed nothing until a summary was written in the same session. The tab now sits on a `Color.clear`, which is always drawn, and a UI test relaunches the app and checks that a saved summary shows.
+
+### App Transport Security covers IP addresses and `.local`, not other home names (Nov 11, 2026)
+
+`NSAllowsLocalNetworking` allows plain http to IP addresses (v4 and v6), `.local` names and names without a dot. Since macOS 14, IP addresses need it. It doesn't cover other names on a home network, such as `studio.lan` or a Tailscale name, and with it present the system ignores `NSAllowsArbitraryLoads`. Minutes says to use the server's IP address or https when ATS refuses one (`appTransportSecurityRequiresSecureConnection`). ATS allowing http to any IP address isn't a gap: Minutes itself refuses http to an address outside the network.
+
+### The UI test runner can't listen without `network.server` (Nov 11, 2026)
+
+The runner Xcode builds for UI tests is sandboxed with `network.client` only, so `NWListener` fails with `bind: Operation not permitted`. Xcode merges the test target's entitlements into the runner, so `AppUITests/MinutesUITests.entitlements` adds `com.apple.security.network.server`. The app's own entitlements don't change.
+
+### A cancelled consumer sees an `AsyncThrowingStream` end, not throw (Nov 11, 2026)
+
+Cancelling the task that iterates the stream makes `next()` return nil, so `for try await` just ends with what arrived. The producer's `onTermination` runs, which is where the request is cancelled.
 
 ### `SpeechTranscriber` ignores contextual strings (Nov 6, 2026)
 
@@ -452,3 +492,12 @@ These are llama.cpp's rather than Apple's, kept here so the next upgrade checks 
 - **Downloads redirect.** `huggingface.co/<repo>/resolve/<commit>/<file>` answers with a 302 to Hugging Face's CDN, such as `us.aws.cdn.hf.co`. URLSession keeps the `Range` header through the redirect and gets a 206.
 - **The sliding-window cache defaults to full size.** `llama_context_default_params` sets `swa_full`, so Gemma's sliding-window layers, most of the model, keep cache for the whole context. On the 12B at 32K that made the footprint 11.5 GB. With other apps open, this 24 GB Mac swapped, wrote at 2 tokens/s, and the 2-hour summary failed with `llama_decode` error -3. Minutes clears the cache before each prompt and runs one conversation at a time, so it sets `swa_full = false`. The 12B then needs 1.3 GB beside its mapped weights.
 - **Gemma 4 templates differ between sizes.** With thinking off, the 12B's template ends the prompt with an empty thought block, `<|channel>thought\n<channel|>`, and E2B's and E4B's don't. Without it the 12B writes that block at the start of every answer, as plain text. `ChatFormat` adds the block when the template has it, and the real-model test checks that no marker reaches the summary.
+
+### llama-server b12110 (Nov 11, 2026)
+
+- **It lets Gemma 4 think by default** (`--reasoning auto`) and moves the thoughts to `reasoning_content`. `reasoning_effort: "none"` or `chat_template_kwargs: {"enable_thinking": false}` turns that off per request.
+- **`-np` defaults to auto,** which splits `-c` between several slots. Run it with `-np 1` for one long conversation.
+- **A model's ID is its file's full path,** unless it was started with `--alias`. Minutes shows the file name without `.gguf`.
+- **It answers at its root as well as under `/v1`,** so an address without `/v1` works as typed.
+- **`/v1/models` gives each model's `meta.n_ctx`,** as does `/props` under `default_generation_settings`.
+- **A prompt longer than the context is a 400** with `type: exceed_context_size_error`, sent before any stream starts.

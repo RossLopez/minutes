@@ -67,5 +67,6 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.github.rosslopez.minutes.uitests
         GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_ENTITLEMENTS: AppUITests/MinutesUITests.entitlements
     dependencies:
       - target: Minutes

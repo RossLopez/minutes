@@ -45,6 +45,8 @@ enum SummaryRun {
             reason
         case LLMError.promptTooLong:
             "Part of the transcript is too long for the model to read."
+        case let error as EndpointError:
+            error.message
         case MeetingFolder.FolderError.newerFileFormat:
             "This meeting was saved by a newer version of Minutes."
         default:

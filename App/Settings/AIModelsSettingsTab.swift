@@ -6,31 +6,42 @@ import SwiftUI
 struct AIModelsSettingsTab: View {
     @Bindable private var center = SummaryCenter.shared
 
-    private var installed: [CatalogModel] {
-        ModelCatalog.all.filter { center.states[$0.id] == .installed }
+    private var models: AIModelCenter {
+        .shared
+    }
+
+    /// Where summaries are written, said plainly.
+    private var summaryFooter: String {
+        var place: String?
+        if case let .endpoint(id, _)? = center.summaryChoice, let endpoint = models.endpoint(id) {
+            place = "Transcripts are sent to \(endpoint.name) at \(endpoint.baseURL.host() ?? "its address")."
+        }
+        return (place ?? "Summaries are written on this Mac. Nothing is sent anywhere.")
+            + " Turn off automatic summaries to summarize from a meeting's Summary tab instead."
     }
 
     var body: some View {
         Form {
             Section {
-                Picker("Summaries are written by", selection: $center.modelID) {
-                    if installed.isEmpty {
-                        Text("No model installed").tag(center.modelID)
-                    }
-                    ForEach(installed) { model in
-                        Text(model.name).tag(model.id)
-                    }
+                ModelChoicePicker(title: "Default model", feature: nil)
+                ForEach(AIFeature.allCases) { feature in
+                    ModelChoicePicker(title: feature.title, feature: feature)
                 }
-                .disabled(installed.isEmpty)
-                .accessibilityIdentifier("summaryModel")
+            } footer: {
+                Text("""
+                Notes cleanup and Chat arrive in a later version of Minutes. What you choose for them now \
+                is kept.
+                """)
+            }
+
+            Section {
                 Toggle("Summarize meetings automatically", isOn: $center.summarizesAutomatically)
                     .accessibilityIdentifier("summarizeAutomatically")
             } footer: {
-                Text("""
-                When a transcript is ready, the summary is written on this Mac. Nothing is sent anywhere. \
-                Turn this off to summarize from a meeting's Summary tab instead.
-                """)
+                Text(summaryFooter)
             }
+
+            EndpointsSection()
 
             Section {
                 ForEach(ModelCatalog.all.filter { !$0.isAdvanced }) { model in
