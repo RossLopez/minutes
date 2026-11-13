@@ -33,9 +33,13 @@ final class RecordFlowUITests: MinutesUITestCase {
         checkKeyboardAndSpeed()
         try renameWhilePlaying()
 
-        // A new recording pauses playback.
+        // A new recording pauses playback, and shows its notes in place of the meeting.
         record.click()
         XCTAssertTrue(stop.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.textViews["notesEditor"].waitForExistence(timeout: 10))
+        let renamed = NSPredicate(format: "value BEGINSWITH %@", "Budget Review")
+        app.outlines["meetingList"].staticTexts.matching(renamed).firstMatch.click()
+        XCTAssertTrue(playPause.waitForExistence(timeout: 10))
         wait(for: "paused by recording") { self.playPause.label == "Play" }
         stop.click()
         XCTAssertTrue(app.staticTexts["recordingSaved"].waitForExistence(timeout: 20))

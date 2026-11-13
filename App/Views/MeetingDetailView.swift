@@ -20,11 +20,15 @@ struct MeetingDetailView: View {
         case .ready:
             ready
         case .recording:
-            ContentUnavailableView(
-                "Recording in Progress",
-                systemImage: "record.circle",
-                description: Text("You can listen to this meeting after you stop recording."),
-            )
+            if store.isActive(entry) {
+                RecordingNotesView(store: store, entry: entry)
+            } else {
+                ContentUnavailableView(
+                    "Recording in Progress",
+                    systemImage: "record.circle",
+                    description: Text("You can listen to this meeting after you stop recording."),
+                )
+            }
         case .saving:
             ContentUnavailableView("Saving…", systemImage: "arrow.down.circle")
         case .notFinished:
@@ -51,12 +55,7 @@ struct MeetingDetailView: View {
             } else if tab == .summary {
                 SummaryTab(entry: entry)
             } else {
-                ContentUnavailableView(
-                    tab.title,
-                    systemImage: tab.systemImage,
-                    description: Text(tab.emptyDescription),
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                NotesTab(store: store, entry: entry)
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -224,22 +223,6 @@ private enum MeetingTab: String, CaseIterable, Identifiable {
         case .summary: "Summary"
         case .transcript: "Transcript"
         case .notes: "Notes"
-        }
-    }
-
-    var systemImage: String {
-        switch self {
-        case .summary: "text.alignleft"
-        case .transcript: "text.quote"
-        case .notes: "note.text"
-        }
-    }
-
-    var emptyDescription: String {
-        switch self {
-        case .summary: ""
-        case .transcript: ""
-        case .notes: "Notes arrive in Milestone 7."
         }
     }
 }

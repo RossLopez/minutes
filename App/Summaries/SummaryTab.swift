@@ -357,17 +357,19 @@ private struct NeedsModelView: View {
     }
 }
 
-/// Who wrote the summary, and a mark when it was a server outside the user's network.
-private struct ModelLabel: View {
+/// Who wrote the summary or cleanup, and a mark when it was a server outside the user's network.
+struct ModelLabel: View {
+    var verb = "Written by"
     let model: String
     let date: Date
     let isOffNetwork: Bool
+    var identifier = "summaryModel"
 
     var body: some View {
         let when = date.formatted(date: .abbreviated, time: .shortened)
         let written = isOffNetwork
-            ? "Written by \(model), outside your network, \(when)"
-            : "Written by \(model), \(when)"
+            ? "\(verb) \(model), outside your network, \(when)"
+            : "\(verb) \(model), \(when)"
         HStack(spacing: 4) {
             if isOffNetwork {
                 Image(systemName: "network")
@@ -381,6 +383,6 @@ private struct ModelLabel: View {
         .help(written)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(written)
-        .accessibilityIdentifier("summaryModel")
+        .accessibilityIdentifier(identifier)
     }
 }

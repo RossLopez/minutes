@@ -32,6 +32,7 @@ final class LibraryStore {
     private(set) var searchRequests = 0
     var isEditingTitle = false
     var isEditingSearch = false
+    var isEditingNotes = false
     var searchText = "" {
         didSet {
             rebuildSections()
@@ -43,7 +44,7 @@ final class LibraryStore {
 
     @ObservationIgnored private let pointer: LibraryPointer
     @ObservationIgnored private let defaultRoot: URL
-    @ObservationIgnored private let trashFolderForTests: URL?
+    @ObservationIgnored let trashFolderForTests: URL?
     @ObservationIgnored private var scanGeneration = 0
     @ObservationIgnored private var beingTrashed: Set<URL> = []
 
@@ -69,11 +70,6 @@ final class LibraryStore {
 
     var selectedEntry: MeetingEntry? {
         entries.first { $0.id == selection }
-    }
-
-    /// Keeps ⌘⌫ and Space away from the meeting and player while someone is typing.
-    var isEditingText: Bool {
-        isEditingTitle || isEditingSearch
     }
 
     var isUsingDefaultLocation: Bool {
@@ -178,6 +174,7 @@ final class LibraryStore {
         }
         let wasPlayerOpen = player.loadedFolder == entry.id
         let position = player.state
+        NotesCenter.shared.flush(entry.id)
         do {
             // Through the queues, so a job running on this meeting follows its folder.
             let library = library
@@ -185,6 +182,7 @@ final class LibraryStore {
                 try TranscriptionCenter.shared.queue.move(folder.url) { try library.rename($0, to: title) }
             }
             RecordingController.shared.folderMoved(from: entry.id, to: renamed.url)
+            NotesCenter.shared.folderMoved(from: entry.id, to: renamed.url)
             if selection == entry.id {
                 selection = renamed.url
             }
@@ -220,6 +218,7 @@ final class LibraryStore {
         let wasSummarizing = summaries.activity?.folder == entry.id || summaries.isWaiting(entry.id)
         await queue.remove(entry.id)
         await summaries.remove(entry.id)
+        NotesCenter.shared.flush(entry.id)
         do {
             if let trashFolderForTests {
                 try FileManager.default.createDirectory(at: trashFolderForTests, withIntermediateDirectories: true)
@@ -231,6 +230,7 @@ final class LibraryStore {
                 try library.moveToTrash(entry.folder)
             }
             RecordingController.shared.folderGone(entry.id)
+            NotesCenter.shared.forget(entry.id)
             entries.removeAll { $0.id == entry.id }
             rebuildSections()
             if selection == entry.id {
@@ -334,6 +334,7 @@ extension LibraryStore {
         ) else {
             return
         }
+        NotesCenter.shared.flushAll()
         isMovingLibrary = true
         player.unload()
         let selectionName = selection?.lastPathComponent
@@ -348,6 +349,7 @@ extension LibraryStore {
 
         switch outcome {
         case let .success(result):
+            NotesCenter.shared.libraryChanged()
             let reselect = selectionName.map {
                 MinutesLibrary(root: result.newRoot).meetingsFolder.appendingPathComponent($0, isDirectory: true)
             }

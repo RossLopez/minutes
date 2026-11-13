@@ -46,7 +46,8 @@ final class RecordingController {
     @ObservationIgnored private var meeting: ActiveMeeting?
     @ObservationIgnored private var meterTask: Task<Void, Never>?
     @ObservationIgnored private var activity: any NSObjectProtocol?
-    @ObservationIgnored private var startedAt = ContinuousClock.now
+    /// When capture began, which the notes' line times count from.
+    @ObservationIgnored private(set) var startedAt = ContinuousClock.now
     @ObservationIgnored private var tickCount = 0
     @ObservationIgnored private var freeBytes: Int64?
 
@@ -173,6 +174,7 @@ final class RecordingController {
         activeFolder = meeting?.folder.url
         Task {
             await LibraryStore.shared.refresh()
+            LibraryStore.shared.showRecording()
         }
         meterTask = Task { [weak self] in
             while !Task.isCancelled {
@@ -303,13 +305,6 @@ extension RecordingController {
         lastSavedFolder = nil
     }
 
-    func revealLastSaved() {
-        guard let lastSavedFolder else {
-            return
-        }
-        NSWorkspace.shared.activateFileViewerSelecting([lastSavedFolder])
-    }
-
     func openPermissionsSettings() {
         openSettings(.permissions)
     }
@@ -321,6 +316,7 @@ extension RecordingController {
 
     /// Capture never competes with transcribing or summarizing, and saving a recording needs the disk.
     private func pauseOrResumeTranscribing(after oldPhase: Phase) {
+        NotesCenter.shared.recordingPhaseChanged(from: oldPhase, to: phase, folder: activeFolder)
         guard (phase == .idle) != (oldPhase == .idle) else {
             return
         }

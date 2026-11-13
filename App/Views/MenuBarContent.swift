@@ -16,6 +16,11 @@ struct MenuBarContent: View {
         if controller.isRecording {
             let elapsed = Duration.seconds(controller.elapsedSeconds).formatted(.time(pattern: .hourMinuteSecond))
             Text("Recording: \(elapsed)")
+            Button("Take Notes…") {
+                NSApplication.shared.activate()
+                openWindow(id: SceneID.mainWindow)
+                LibraryStore.shared.showRecording()
+            }
         } else if controller.phase == .saving {
             Text("Saving…")
         }

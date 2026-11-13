@@ -68,7 +68,7 @@ public enum AIFeature: String, CaseIterable, Identifiable, Sendable {
 
     /// Whether this version of Minutes uses the choice yet.
     public var isAvailable: Bool {
-        self == .summaries
+        self != .chat
     }
 }
 

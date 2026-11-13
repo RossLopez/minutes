@@ -35,6 +35,16 @@ struct RecordingHUD: View {
                     LevelMeterView(title: "System", accessibilityName: "System audio", level: controller.systemLevel)
                 }
 
+                if LibraryStore.shared.selection != controller.activeFolder
+                    || LibraryStore.shared.sidebarItem != .allMeetings
+                {
+                    Button("Notes", systemImage: "note.text") {
+                        LibraryStore.shared.showRecording()
+                    }
+                    .help("Show this recording's notes")
+                    .accessibilityIdentifier("showRecordingNotes")
+                }
+
                 Button("Stop", systemImage: "stop.fill", role: .destructive) {
                     controller.stopRecording()
                 }

@@ -28,10 +28,7 @@ struct AIModelsSettingsTab: View {
                     ModelChoicePicker(title: feature.title, feature: feature)
                 }
             } footer: {
-                Text("""
-                Notes cleanup and Chat arrive in a later version of Minutes. What you choose for them now \
-                is kept.
-                """)
+                Text("Chat arrives in a later version of Minutes. What you choose for it now is kept.")
             }
 
             Section {

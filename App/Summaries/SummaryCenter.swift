@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import Foundation
-import MinutesLlama
 import MinutesLLM
 import MinutesPipeline
 import MinutesStorage
@@ -40,9 +39,6 @@ final class SummaryCenter {
     private nonisolated static let logger = Logger(subsystem: "io.github.rosslopez.minutes", category: "summary")
     private nonisolated static let fakeModelID = "fake"
 
-    /// The context Minutes asks for. Long meetings are read in parts that fit it.
-    static let contextLength = 32768
-
     let queue: SummaryQueue
     private(set) var states: [String: ModelState] = [:]
     /// A download that stopped with an error, by model, said for the user.
@@ -62,9 +58,9 @@ final class SummaryCenter {
         }
     }
 
-    @ObservationIgnored private var providers: [String: LlamaProvider] = [:]
     @ObservationIgnored private var downloads: [String: Task<Void, Never>] = [:]
-    @ObservationIgnored private let fakeProvider: any LLMProvider?
+    /// Stands in for every model in UI tests.
+    @ObservationIgnored let fakeProvider: any LLMProvider?
     @ObservationIgnored private var isHeld = false
 
     private init() {
@@ -89,6 +85,14 @@ final class SummaryCenter {
         #if DEBUG
             if ProcessInfo.processInfo.environment["MINUTES_FAKE_LLM"] == "1" {
                 return FakeLLMProvider(id: fakeModelID) { messages in
+                    if let notes = messages.last?.content.components(separatedBy: "The notes to tidy up:\n").last,
+                       messages.first?.content.contains("tidy up notes") == true
+                    {
+                        let bullets = notes.split(separator: "\n").map { line in
+                            "- " + line.replacing(#/^\[[0-9:]+\] /#, with: "").capitalized
+                        }
+                        return "## Cleaned up\n" + bullets.joined(separator: "\n")
+                    }
                     let asked = messages.last?.content.split(separator: "\n").first.map(String.init) ?? ""
                     return """
                     ## Overview
@@ -121,12 +125,12 @@ final class SummaryCenter {
 
     /// Whether moving the library now would pull files out from under something.
     var isBusy: Bool {
-        queue.isBusy || !downloads.isEmpty
+        queue.isBusy || !downloads.isEmpty || NotesCenter.shared.isBusy
     }
 
     // MARK: - The model
 
-    private var installedModels: Set<String> {
+    var installedModels: Set<String> {
         Set(states.filter { $0.value == .installed }.keys)
     }
 
@@ -151,24 +155,8 @@ final class SummaryCenter {
             guard case let .builtIn(id) = choice else {
                 return AIModelCenter.shared.provider(for: choice)
             }
-            return builtInProvider(id)
+            return BuiltInModels.shared.provider(for: id)
         }
-    }
-
-    private func builtInProvider(_ id: String) -> LlamaProvider? {
-        guard let model = ModelCatalog.model(id: id), downloader.isInstalled(model) else {
-            return nil
-        }
-        if let provider = providers[model.id] {
-            return provider
-        }
-        let provider = LlamaProvider(
-            id: "builtin:\(model.id)",
-            modelURL: downloader.installedFile(for: model),
-            contextLength: Self.contextLength,
-        )
-        providers[model.id] = provider
-        return provider
     }
 
     /// The choices or endpoints changed: a summary waiting for a model may have one now.
@@ -177,20 +165,19 @@ final class SummaryCenter {
         queue.resumeWaitingForModel(in: LibraryStore.shared.library)
     }
 
-    /// Frees built-in models nothing uses, which includes all of them when summaries use an
+    /// Frees built-in models no feature uses, which is all of them when every feature uses an
     /// endpoint.
     private func unloadUnusedModels() {
-        let inUse = if case let .builtIn(id) = summaryChoice {
-            id
-        } else {
-            ""
-        }
-        for (id, provider) in providers where id != inUse {
-            Task {
-                await provider.unload()
+        let installed = installedModels
+        let inUse = AIFeature.allCases.compactMap { feature -> String? in
+            guard feature.isAvailable,
+                  case let .builtIn(id) = AIModelCenter.shared.resolvedChoice(for: feature, installed: installed)
+            else {
+                return nil
             }
-            providers[id] = nil
+            return id
         }
+        BuiltInModels.shared.unload(except: Set(inUse))
     }
 
     // MARK: - Downloads
@@ -261,16 +248,14 @@ final class SummaryCenter {
 
     /// Whether a model is in use and can't be deleted.
     func isInUse(_ model: CatalogModel) -> Bool {
-        summaryChoice == .builtIn(model.id) && queue.activity != nil
+        (summaryChoice == .builtIn(model.id) && queue.activity != nil) || NotesCenter.shared.isUsing(builtIn: model.id)
     }
 
     func delete(_ model: CatalogModel) async {
         guard !isInUse(model), downloads[model.id] == nil else {
             return
         }
-        if let provider = providers.removeValue(forKey: model.id) {
-            await provider.unload()
-        }
+        await BuiltInModels.shared.unload(model.id)
         do {
             try downloader.delete(model)
         } catch {
@@ -300,7 +285,8 @@ final class SummaryCenter {
 
     /// The library moved or another was chosen: its models and summaries are different.
     func libraryChanged() {
-        providers.removeAll()
+        NotesCenter.shared.libraryChanged()
+        BuiltInModels.shared.forgetAll()
         refreshModels()
         templatesChanged()
         queue.resumeInterrupted(in: LibraryStore.shared.library)
@@ -329,9 +315,7 @@ final class SummaryCenter {
     /// exits. The summary starts again at the next launch.
     func prepareForExit() {
         queue.pause()
-        for provider in providers.values {
-            provider.unloadBeforeExit()
-        }
+        BuiltInModels.shared.prepareForExit()
     }
 }
 
