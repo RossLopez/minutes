@@ -45,6 +45,8 @@ public final class SummaryQueue {
 
     public private(set) var activity: Activity?
     public private(set) var isPaused = false
+    /// Waiting for another use of the model to finish. Unlike pausing, the summary under way goes on.
+    public private(set) var isHeld = false
     private var waiting: [Waiting] = []
 
     /// A meeting's summary changed on disk.
@@ -157,6 +159,17 @@ public final class SummaryQueue {
         advance()
     }
 
+    /// Lets the summary under way finish, then starts nothing until `release()`, so something else
+    /// can use the model. Combines with pausing: the queue runs only when neither holds it.
+    public func hold() {
+        isHeld = true
+    }
+
+    public func release() {
+        isHeld = false
+        advance()
+    }
+
     /// Lets go of a meeting that's about to be moved to the Trash, and waits for its work to stop.
     public func remove(_ folder: URL) async {
         waiting.removeAll { $0.folder == folder }
@@ -198,7 +211,7 @@ public final class SummaryQueue {
     // MARK: - Running
 
     private func advance() {
-        guard !isPaused, job == nil else {
+        guard !isPaused, !isHeld, job == nil else {
             return
         }
         guard !waiting.isEmpty else {
@@ -295,7 +308,7 @@ public final class SummaryQueue {
         stopReason = nil
         onChange(folder.url)
         advance()
-        if isPaused {
+        if isPaused || isHeld {
             keepAwake.end()
         }
     }

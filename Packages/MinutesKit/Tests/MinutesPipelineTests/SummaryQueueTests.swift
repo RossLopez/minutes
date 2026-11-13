@@ -253,6 +253,33 @@ private func until(_ condition: () -> Bool) async {
 }
 
 @MainActor
+@Test func `holding lets the summary under way finish and keeps the next one waiting until released`() async throws {
+    let setup = try SummarySetup()
+    let gate = Gate()
+    setup.model.state.withLock { $0.gate = gate }
+    let first = try setup.meeting("First", startedAt: Date(timeIntervalSince1970: 1_000_000_000))
+    let second = try setup.meeting("Second", startedAt: Date(timeIntervalSince1970: 2_000_000_000))
+    let queue = setup.queue()
+    queue.enqueue(first.url)
+    queue.enqueue(second.url)
+    await gate.arrival()
+    queue.hold()
+    gate.open()
+    await until { queue.activity == nil }
+    #expect(try summary(first)?.status == .complete)
+    #expect(try summary(second)?.status == .queued)
+    #expect(setup.model.prompts.count == 1)
+    // Unpausing doesn't end a hold.
+    queue.pause()
+    queue.unpause()
+    #expect(queue.activity == nil)
+
+    queue.release()
+    await finished(queue)
+    #expect(try summary(second)?.status == .complete)
+}
+
+@MainActor
 @Test func `renaming the meeting mid-summary saves it in the new folder`() async throws {
     let setup = try SummarySetup()
     let gate = Gate()

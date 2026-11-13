@@ -72,6 +72,9 @@ class MinutesUITestCase: XCTestCase {
         app.launchArguments += ["-consentNoteShown", "YES", "-speakers.remembersVoices", "NO"]
         app.launchArguments += ["-general.yourName", "Robin", "-meeting.tab", tab]
         app.launchArguments += ["-ai.summarizeAutomatically", "YES", "-ai.defaultTemplate", "Default"]
+        // Typed text arrives as typed, whatever this Mac's keyboard settings.
+        app.launchArguments += ["-NSAutomaticSpellingCorrectionEnabled", "NO"]
+        app.launchArguments += ["-NSAutomaticCapitalizationEnabled", "NO"]
         app.launch()
     }
 

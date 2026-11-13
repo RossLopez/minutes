@@ -25,6 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_: Notification) {
+        NotesCenter.shared.prepareForExit()
         SummaryCenter.shared.prepareForExit()
     }
 

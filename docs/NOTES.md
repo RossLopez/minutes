@@ -4,6 +4,22 @@ Spec-level decisions, and places where Apple APIs behave differently than docume
 
 ## Decisions
 
+### Note times are kept beside the notes, by fingerprint (Nov 12, 2026)
+
+`notes.md` holds the notes exactly as typed. Each line's time goes in `notes.json` with a 6-byte salted SHA-256 fingerprint of the line, never its text, so a line deleted from `notes.md` in another editor is really gone. On load, the fingerprints are lined up with the file's lines, and only unchanged lines keep their times. The times aren't in `meeting.json` because during a recording `ActiveMeeting` owns that file and writes all of it when capture stops, which would overwrite what the editor put there.
+
+### A replaced cleanup goes to the Trash (Nov 12, 2026)
+
+Accepting a cleanup when `notes-cleaned.md` already exists moves the old file to the Trash first, so edits made to it by hand can be recovered. The notes as typed are never changed by a cleanup.
+
+### Cleanups take turns with recording, transcription and summaries (Nov 12, 2026)
+
+A cleanup waits for a recording to end, then for transcription, then for another cleanup being written, then holds the summary queue and waits for the summary under way. `SummaryQueue.hold()` was added for this: unlike `pause()`, it doesn't cancel the job under way. Starting a recording stops a cleanup, which can be run again. Summaries and cleanups share one loaded built-in model through `BuiltInModels`.
+
+### The notes are the cleanup's source, the transcript only its reference (Nov 12, 2026)
+
+The cleanup prompt sends every note, with its time, and as much transcript as fits: all of it, then excerpts from 3 minutes before to 1 minute after each timed note (narrowing to 20 s before), then the summary, then names only. The prompt's rules came from three rounds on ES2004a. The first prompt let E4B turn a note's meaning around ("plastic ok but stylish" became "does not need to be as fashionable and stylish"), drop notes such as the black-and-white LCD question, pad bullets with details from the transcript, and fill action items with placeholders, and both models lost who said what. The rules now say to keep every note as a bullet, keep question marks as open questions, keep attributions with full names, take nothing from the transcript beyond names, spellings and shorthand, and add action items only when the notes have tasks.
+
 ### Minimum OS is macOS 27 (Nov 5, 2026)
 
 The spec originally targeted macOS 26. Ross chose to support only macOS 27, the latest release, and `docs/BUILD_PROMPT.md` was updated to match.
@@ -257,9 +273,42 @@ On the M5 Pro with 24 GB, release `minutes-llmcheck`, the same GGUFs through Hom
 - **Errors, live:** no key and a wrong key (`--api-key`) both give "didn't accept the API key", and a context longer than the server's gives the context-length message. Test Connection reads `n_ctx` from `/v1/models`, which llama-server lists with each model.
 - **Through the app:** the Debug app added llama-server from Settings over plain http to 127.0.0.1, detected its 4,096-token context, and shows it as "On this Mac". The UI test does the rest against a stand-in server: pick its model for Summaries, record, and get a summary labelled "stub-model on Stub".
 
+## Milestone 7 measurements (Nov 12, 2026)
+
+On the M5 Pro with 24 GB, release `minutes-llmcheck --notes` with the built-in runtime unless noted. The notes are 16 shorthand lines written for AMI ES2004a with times, against the 260-line manual transcript, so the whole transcript fits (a prompt of about 6.7k tokens).
+
+| Model | Total | Answer | Peak memory |
+| --- | --- | --- | --- |
+| E4B | 11 s | 532 tokens | 869 MB |
+| 12B | 21 s | 362 tokens | 1,283 MB |
+| 12B, two hours (1,833 lines) | 21 s | | |
+| 12B through llama-server (`-c 32768 -np 1`) | 20 s | | |
+
+- **Two hours** doesn't fit, so the cleaner sent two excerpts at 180 s before and 60 s after, a 6,121-token prompt, with the same result as the single meeting.
+- **Through llama-server** the output matched the built-in run's.
+- **Quality:** the 12B keeps all 16 points with the right people and expands shorthand from the transcript. E4B still drops one note (the black-and-white LCD), adds one point from the transcript, and writes placeholder action items, so the 12B stays the recommended model.
+- **Through the app,** with fake audio, transcription and model: notes typed while recording saved within a second with their times in the margin, list items continued on Return, the HUD's Notes button came back to the recording, clicking a margin time played from there, a cleanup started during a recording waited for it and for transcription, and Accept wrote `notes-cleaned.md`, moved the previous one to the Trash and showed the cleaned-up notes.
+- **Privacy:** the app's notes log holds only error types. `notes.json` holds fingerprints and times, no text.
+
 ## Apple API notes
 
 Measurements are from a MacBook Pro on macOS 27.0.1 with a quiet test tone played by `afplay`, unless a note says otherwise.
+
+### Launch-argument defaults win over `@AppStorage` writes (Nov 12, 2026)
+
+A default passed as a launch argument, such as `-notes.showsCleaned NO`, sits in the argument domain, which is searched before the app's own. An `@AppStorage` write goes to the app's domain, so the view keeps reading the argument's value and a control bound to it seems not to work. UI tests pass only defaults the test never changes. The notes test doesn't seed `notes.showsCleaned`: a new meeting has no cleaned-up notes, so the editor shows either way.
+
+### `NSTextView` corrects and capitalizes as typed, per the system settings (Nov 12, 2026)
+
+With "Correct spelling automatically" and "Capitalize words automatically" on in Keyboard settings, the notes editor turned "bea wants nums" into "be a wants nuts" and capitalized the start of each line that isn't a list item. The editor follows those settings, as Notes does, and Edit > Spelling and Grammar turns correction off for it. UI tests pass `-NSAutomaticSpellingCorrectionEnabled NO` and `-NSAutomaticCapitalizationEnabled NO`, which the argument domain applies to the app alone, so typed text arrives as typed.
+
+### Hiding an `NSRulerView` from accessibility hides its scroll view's contents (Nov 12, 2026)
+
+With the time ruler set to `setAccessibilityElement(false)`, the scroll view's `AXChildren` failed with kAXErrorFailure and the app logged an `NSInvalidArgumentException`, though `AXContents` still named the text view. VoiceOver and XCUITest go by children, so the notes editor couldn't be found at all, while hit-testing still reached it. Overriding the ruler's `accessibilityChildren()` to return none didn't help. The ruler stays an element, labelled "Line Times", and the scroll view lists the text area, its scroll bar and the ruler.
+
+### The notes margin uses TextKit 2 only (Nov 12, 2026)
+
+The editor is `NSTextView(usingTextLayoutManager: true)`. Asking such a view for its `layoutManager` switches it to TextKit 1 for good, so the time ruler finds lines with `textLayoutManager.enumerateTextLayoutFragments(from:options: [.ensuresLayout])`, starting at `textViewportLayoutController.viewportRange`, and uses each fragment's first line's `typographicBounds`.
 
 ### A `.task` on a view that draws nothing never runs (Nov 9, 2026)
 

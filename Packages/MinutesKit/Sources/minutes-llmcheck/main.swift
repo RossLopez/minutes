@@ -11,6 +11,7 @@ import MinutesStorage
 //   minutes-llmcheck <model.gguf> --template
 //   minutes-llmcheck <model.gguf> --prompt <text> [--system <text>] [--context <tokens>]
 //   minutes-llmcheck <model.gguf> --summarize <meeting folder>... [--context <tokens>]
+//   minutes-llmcheck <model.gguf> --notes <file> --summarize <meeting folder>... [--context <tokens>]
 //   minutes-llmcheck --endpoint <base URL> [--model <name>] (--prompt <text> | --summarize <folder>...)
 //
 // --endpoint runs the same prompts on an OpenAI-compatible server, such as llama-server, for
@@ -70,6 +71,9 @@ let endpoint = option("--endpoint", in: &arguments).map { text in
 let endpointModel = option("--model", in: &arguments)
 let prompt = option("--prompt", in: &arguments)
 let system = option("--system", in: &arguments)
+/// With --summarize: clean up these notes against the folders' transcripts instead of summarizing.
+/// One note per line, each with an optional `[m:ss]` time in front.
+let notesFile = option("--notes", in: &arguments)
 let showTemplate = arguments.contains("--template")
 arguments.removeAll { $0 == "--template" }
 var folders: [URL] = []
@@ -138,6 +142,34 @@ func joinedLines(_ folders: [URL]) throws -> (lines: [SummaryLine], title: Strin
     return (lines, titles.joined(separator: " + "))
 }
 
+if let notesFile, !folders.isEmpty {
+    let (lines, title) = try joinedLines(folders)
+    let notes = try readNotes(notesFile)
+    let summary = MeetingFolder(url: folders[0]).loadSummary()
+    let names = lines.reduce(into: [String]()) { names, line in
+        if !names.contains(line.speaker) {
+            names.append(line.speaker)
+        }
+    }
+    let start = ContinuousClock.now
+    let result = try await NotesCleaner(provider: provider).clean(
+        notes, transcript: lines, names: names, summary: summary, meeting: title,
+    )
+    print(result.text)
+    print("---")
+    let total = Int(seconds(since: start))
+    try await print("\(notes.count) notes, \(lines.count) lines, context \(provider.contextLength()), "
+        + "given \(result.context), total \(total) s")
+    if let builtIn {
+        let stats = await builtIn.statistics
+        print(String(format: "prompt %d tokens in %.1f s, answer %d tokens in %.1f s, peak memory %.0f MB",
+                     stats.promptTokens, stats.promptSeconds, stats.generatedTokens, stats.generateSeconds,
+                     peakMemoryMB()))
+        await builtIn.unload()
+    }
+    exit(0)
+}
+
 if !folders.isEmpty {
     let (lines, title) = try joinedLines(folders)
     let start = ContinuousClock.now
@@ -203,3 +235,15 @@ try await print(String(
 print(String(format: "total %.1f s, peak memory %.0f MB", seconds(since: start), peakMemoryMB()))
 // ggml asserts at exit if Metal still holds the model.
 await builtIn.unload()
+
+/// Notes from a file, one per line, with `[m:ss]` or `[h:mm:ss]` in front for a time.
+func readNotes(_ path: String) throws -> [NoteLine] {
+    try String(contentsOfFile: path, encoding: .utf8).split(separator: "\n", omittingEmptySubsequences: false)
+        .map { line in
+            guard let match = line.firstMatch(of: #/^\[(?:(\d+):)?(\d+):(\d{2})\] /#) else {
+                return NoteLine(String(line))
+            }
+            let seconds = (Double(match.1 ?? "0") ?? 0) * 3600 + (Double(match.2) ?? 0) * 60 + (Double(match.3) ?? 0)
+            return NoteLine(String(line[match.range.upperBound...]), seconds: seconds)
+        }
+}
