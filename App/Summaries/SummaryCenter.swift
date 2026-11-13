@@ -9,13 +9,8 @@ import Observation
 import os
 
 enum SummaryPreferences {
-    static let modelKey = "ai.model"
     static let automaticKey = "ai.summarizeAutomatically"
     static let defaultTemplateKey = "ai.defaultTemplate"
-
-    static var modelID: String {
-        UserDefaults.standard.string(forKey: modelKey) ?? ModelCatalog.recommended().id
-    }
 
     /// On until the user turns it off.
     static var summarizesAutomatically: Bool {
@@ -54,14 +49,6 @@ final class SummaryCenter {
     private(set) var downloadFailures: [String: String] = [:]
     /// Goes up when templates change on disk, so views reload them.
     private(set) var templatesRevision = 0
-
-    var modelID = SummaryPreferences.modelID {
-        didSet {
-            UserDefaults.standard.set(modelID, forKey: SummaryPreferences.modelKey)
-            unloadUnusedModels()
-            queue.resumeWaitingForModel(in: LibraryStore.shared.library)
-        }
-    }
 
     var summarizesAutomatically = SummaryPreferences.summarizesAutomatically {
         didSet {
@@ -139,20 +126,37 @@ final class SummaryCenter {
 
     // MARK: - The model
 
-    var selectedModel: CatalogModel? {
-        ModelCatalog.model(id: modelID)
+    private var installedModels: Set<String> {
+        Set(states.filter { $0.value == .installed }.keys)
+    }
+
+    /// The model summaries use now, or nil when none can be.
+    var summaryChoice: ModelChoice? {
+        AIModelCenter.shared.resolvedChoice(for: .summaries, installed: installedModels)
     }
 
     /// Whether summaries can be written now.
     var hasModel: Bool {
-        fakeProvider != nil || selectedModel.map { states[$0.id] == .installed } == true
+        fakeProvider != nil || summaryChoice != nil
     }
 
     private func currentProvider() -> (any LLMProvider)? {
         if let fakeProvider {
             return fakeProvider
         }
-        guard let model = selectedModel, downloader.isInstalled(model) else {
+        switch summaryChoice {
+        case nil:
+            return nil
+        case let choice?:
+            guard case let .builtIn(id) = choice else {
+                return AIModelCenter.shared.provider(for: choice)
+            }
+            return builtInProvider(id)
+        }
+    }
+
+    private func builtInProvider(_ id: String) -> LlamaProvider? {
+        guard let model = ModelCatalog.model(id: id), downloader.isInstalled(model) else {
             return nil
         }
         if let provider = providers[model.id] {
@@ -167,17 +171,21 @@ final class SummaryCenter {
         return provider
     }
 
-    /// The name a summary's `model` field stands for.
-    func modelName(for id: String?) -> String? {
-        guard let id else {
-            return nil
-        }
-        let bare = id.hasPrefix("builtin:") ? String(id.dropFirst("builtin:".count)) : id
-        return ModelCatalog.model(id: bare)?.name ?? bare
+    /// The choices or endpoints changed: a summary waiting for a model may have one now.
+    func choicesChanged() {
+        unloadUnusedModels()
+        queue.resumeWaitingForModel(in: LibraryStore.shared.library)
     }
 
+    /// Frees built-in models nothing uses, which includes all of them when summaries use an
+    /// endpoint.
     private func unloadUnusedModels() {
-        for (id, provider) in providers where id != modelID {
+        let inUse = if case let .builtIn(id) = summaryChoice {
+            id
+        } else {
+            ""
+        }
+        for (id, provider) in providers where id != inUse {
             Task {
                 await provider.unload()
             }
@@ -253,7 +261,7 @@ final class SummaryCenter {
 
     /// Whether a model is in use and can't be deleted.
     func isInUse(_ model: CatalogModel) -> Bool {
-        model.id == modelID && queue.activity != nil
+        summaryChoice == .builtIn(model.id) && queue.activity != nil
     }
 
     func delete(_ model: CatalogModel) async {
@@ -280,33 +288,12 @@ final class SummaryCenter {
 
     private func finishDownload(of model: CatalogModel) {
         states[model.id] = .installed
-        if selectedModel.map({ states[$0.id] != .installed }) ?? true {
-            modelID = model.id
+        let models = AIModelCenter.shared
+        // The first model downloaded becomes the default, unless the default works already.
+        if case let .builtIn(id) = models.defaultChoice, states[id] != .installed {
+            models.defaultChoice = .builtIn(model.id)
         }
         queue.resumeWaitingForModel(in: LibraryStore.shared.library)
-    }
-
-    static func describe(_ error: any Error) -> String {
-        switch error {
-        case let ModelDownloadError.notEnoughSpace(needed, available):
-            "There isn't enough free space. It needs \(bytes(needed)), and \(bytes(available)) is free."
-        case ModelDownloadError.checksumMismatch:
-            "The downloaded file didn't match its checksum, so it was deleted. Try downloading again."
-        case ModelDownloadError.fileNotFound:
-            "Hugging Face no longer has this model's file."
-        case let ModelDownloadError.server(status):
-            "Hugging Face answered with error \(status)."
-        case ModelDownloadError.incomplete:
-            "The download stopped early. Resume to carry on where it left off."
-        case let error as URLError:
-            error.localizedDescription
-        default:
-            "The download stopped."
-        }
-    }
-
-    static func bytes(_ count: Int64) -> String {
-        count.formatted(.byteCount(style: .file))
     }
 
     // MARK: - With the rest of the app
@@ -345,5 +332,43 @@ final class SummaryCenter {
         for provider in providers.values {
             provider.unloadBeforeExit()
         }
+    }
+}
+
+extension SummaryCenter {
+    /// The name a summary's `model` field stands for.
+    func modelName(for id: String?) -> String? {
+        guard let id else {
+            return nil
+        }
+        return ModelChoice(storageID: id).map(AIModelCenter.shared.name(of:)) ?? id
+    }
+
+    /// Whether the model a summary names is a server outside the user's network.
+    func isOffNetwork(_ id: String?) -> Bool {
+        id.flatMap(ModelChoice.init(storageID:)).map(AIModelCenter.shared.isOffNetwork) ?? false
+    }
+
+    static func describe(_ error: any Error) -> String {
+        switch error {
+        case let ModelDownloadError.notEnoughSpace(needed, available):
+            "There isn't enough free space. It needs \(bytes(needed)), and \(bytes(available)) is free."
+        case ModelDownloadError.checksumMismatch:
+            "The downloaded file didn't match its checksum, so it was deleted. Try downloading again."
+        case ModelDownloadError.fileNotFound:
+            "Hugging Face no longer has this model's file."
+        case let ModelDownloadError.server(status):
+            "Hugging Face answered with error \(status)."
+        case ModelDownloadError.incomplete:
+            "The download stopped early. Resume to carry on where it left off."
+        case let error as URLError:
+            error.localizedDescription
+        default:
+            "The download stopped."
+        }
+    }
+
+    static func bytes(_ count: Int64) -> String {
+        count.formatted(.byteCount(style: .file))
     }
 }

@@ -4,7 +4,7 @@ A free, open source, native macOS meeting recorder for Apple Silicon. The full s
 
 ## Non-negotiable principles
 
-1. **Fully local and private.** Audio, transcripts, notes and summaries never leave the Mac. The only network calls allowed are model downloads the user starts, update checks the user can turn off, and requests to a local OpenAI-compatible endpoint the user configures. No telemetry, analytics or crash reporting services.
+1. **Fully local and private.** Audio, transcripts, notes and summaries never leave the Mac. The only network calls allowed are model downloads the user starts, update checks the user can turn off, and requests to an OpenAI-compatible endpoint the user configures. An endpoint outside the user's network must use https, is confirmed with a warning when it's saved, and is marked wherever it's chosen. No telemetry, analytics or crash reporting services.
 2. **No accounts.** No sign-in, no cloud, no license keys.
 3. **No meeting bots, ever.** Minutes never joins, integrates with or automates any meeting app. It only captures audio from the Mac itself.
 4. **Keep the originals.** Full audio files are kept unless the user deletes the meeting.

@@ -28,6 +28,15 @@
 	<string>Minutes records the audio your Mac plays during a meeting, so it can transcribe what other people say. It stays on this Mac.</string>
 	<key>NSHumanReadableCopyright</key>
 	<string>Copyright © 2026 Ross Lopez. Licensed under the GNU GPL, version 3 or later.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<!-- Plain http to a model server on this Mac or the user's network: IP addresses, .local names and
+		     names without a dot. Minutes itself refuses http to servers outside the network. -->
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Minutes connects to model servers you add on your network, such as LM Studio on another Mac, to write summaries.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Minutes records your microphone during a meeting, so it can transcribe what you say. It stays on this Mac.</string>
 </dict>

@@ -145,14 +145,7 @@ struct SummaryTab: View {
             .disabled(isWorking || !center.hasModel)
             .accessibilityIdentifier("summaryTemplate")
             if let summary, let model = center.modelName(for: summary.model), let date = summary.createdAt {
-                let written = "Written by \(model), \(date.formatted(date: .abbreviated, time: .shortened))"
-                Text(model)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .fixedSize()
-                    .help(written)
-                    .accessibilityLabel(written)
+                ModelLabel(model: model, date: date, isOffNetwork: center.isOffNetwork(summary.model))
             }
             Spacer()
             PreviousVersionsMenu(folder: entry.folder, selection: $previous)
@@ -334,7 +327,10 @@ private struct NeedsModelView: View {
         ContentUnavailableView {
             Label("Summaries Need a Model", systemImage: "cpu")
         } description: {
-            Text("Minutes writes summaries with a model that runs on this Mac, so nothing leaves it.")
+            Text("""
+            Minutes writes summaries with a model that runs on this Mac, so nothing leaves it. You can \
+            also use a server you run, such as LM Studio.
+            """)
         } actions: {
             switch center.states[model.id] {
             case let .downloading(progress):
@@ -352,11 +348,39 @@ private struct NeedsModelView: View {
                     title: "Download \(model.name) (about \(SummaryCenter.bytes(model.approximateBytes)))",
                 )
             }
-            Button("Choose Another Size…") {
+            Button("Other Models and Servers…") {
                 RecordingController.shared.openSettings(.aiModels)
             }
             .buttonStyle(.link)
         }
         .accessibilityIdentifier("summaryNeedsModel")
+    }
+}
+
+/// Who wrote the summary, and a mark when it was a server outside the user's network.
+private struct ModelLabel: View {
+    let model: String
+    let date: Date
+    let isOffNetwork: Bool
+
+    var body: some View {
+        let when = date.formatted(date: .abbreviated, time: .shortened)
+        let written = isOffNetwork
+            ? "Written by \(model), outside your network, \(when)"
+            : "Written by \(model), \(when)"
+        HStack(spacing: 4) {
+            if isOffNetwork {
+                Image(systemName: "network")
+            }
+            Text(model)
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
+        .fixedSize()
+        .help(written)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(written)
+        .accessibilityIdentifier("summaryModel")
     }
 }

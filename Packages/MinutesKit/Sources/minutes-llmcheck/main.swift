@@ -11,6 +11,11 @@ import MinutesStorage
 //   minutes-llmcheck <model.gguf> --template
 //   minutes-llmcheck <model.gguf> --prompt <text> [--system <text>] [--context <tokens>]
 //   minutes-llmcheck <model.gguf> --summarize <meeting folder>... [--context <tokens>]
+//   minutes-llmcheck --endpoint <base URL> [--model <name>] (--prompt <text> | --summarize <folder>...)
+//
+// --endpoint runs the same prompts on an OpenAI-compatible server, such as llama-server, for
+// comparing with the built-in runtime. Its key, if it needs one, is read from MINUTES_ENDPOINT_KEY.
+// The context length is --context, else what the server says, else 8192.
 //
 // --summarize joins the folders' transcripts end to end, with their speaker names, and summarizes
 // them as one meeting with the default template.
@@ -54,7 +59,15 @@ func option(_ name: String, in arguments: inout [String]) -> String? {
 }
 
 var arguments = Array(CommandLine.arguments.dropFirst())
-let context = option("--context", in: &arguments).flatMap(Int.init) ?? 32768
+let contextOption = option("--context", in: &arguments).flatMap(Int.init)
+let endpoint = option("--endpoint", in: &arguments).map { text in
+    guard let url = URL(string: text) else {
+        fail("--endpoint needs a URL")
+    }
+    return url
+}
+
+let endpointModel = option("--model", in: &arguments)
 let prompt = option("--prompt", in: &arguments)
 let system = option("--system", in: &arguments)
 let showTemplate = arguments.contains("--template")
@@ -65,11 +78,41 @@ if let index = arguments.firstIndex(of: "--summarize") {
     arguments.removeSubrange(index...)
 }
 
-guard arguments.count == 1 else {
-    fail("usage: minutes-llmcheck <model.gguf> (--template | --prompt <text> [--system <text>]) [--context <tokens>]")
+guard arguments.count == (endpoint == nil ? 1 : 0), endpoint == nil || !showTemplate else {
+    fail("usage: minutes-llmcheck (<model.gguf> | --endpoint <url> [--model <name>]) "
+        + "(--template | --prompt <text> [--system <text>] | --summarize <folder>...) [--context <tokens>]")
 }
 
-let provider = LlamaProvider(id: "check", modelURL: URL(fileURLWithPath: arguments[0]), contextLength: context)
+/// The endpoint's model, with the context length it reports.
+func endpointProvider(_ base: URL) async throws -> OpenAICompatibleProvider {
+    let key = ProcessInfo.processInfo.environment["MINUTES_ENDPOINT_KEY"]
+    let connection = try await EndpointClient(baseURL: base, apiKey: key, serverName: "The endpoint").connect()
+    guard let model = endpointModel ?? connection.models.first else {
+        fail("The endpoint has no models.")
+    }
+    return OpenAICompatibleProvider(
+        id: "check",
+        baseURL: connection.baseURL,
+        model: model,
+        apiKey: key,
+        contextLength: contextOption ?? connection.contextLengths[model] ?? Endpoint.defaultContextLength,
+        serverName: "The endpoint",
+    )
+}
+
+let provider: any LLMProvider = if let endpoint {
+    try await { () async throws -> OpenAICompatibleProvider in
+        do {
+            return try await endpointProvider(endpoint)
+        } catch let error as EndpointError {
+            fail(error.message)
+        }
+    }()
+} else {
+    LlamaProvider(id: "check", modelURL: URL(fileURLWithPath: arguments[0]), contextLength: contextOption ?? 32768)
+}
+
+let builtIn = provider as? LlamaProvider
 var messages: [LLMMessage] = []
 if let system {
     messages.append(LLMMessage(.system, system))
@@ -110,36 +153,45 @@ if !folders.isEmpty {
     )
     print(summary)
     print("---")
-    try await print(String(
-        format: "%d lines, total %d s, context %d, load %.1f s, peak memory %.0f MB",
-        lines.count,
-        Int(seconds(since: start)),
-        provider.contextLength(),
-        provider.statistics.loadSeconds,
-        peakMemoryMB(),
-    ))
-    await provider.unload()
+    let total = Int(seconds(since: start))
+    if let builtIn {
+        try await print(String(
+            format: "%d lines, total %d s, context %d, load %.1f s, peak memory %.0f MB",
+            lines.count, total, builtIn.contextLength(), builtIn.statistics.loadSeconds, peakMemoryMB(),
+        ))
+        await builtIn.unload()
+    } else {
+        // The server's own log has its speed and memory.
+        try await print("\(lines.count) lines, total \(total) s, context \(provider.contextLength())")
+    }
     exit(0)
 }
 
-if showTemplate {
-    try await print(provider.formattedPrompt(messages))
-    await provider.unload()
+if showTemplate, let builtIn {
+    try await print(builtIn.formattedPrompt(messages))
+    await builtIn.unload()
     exit(0)
 }
 
 let start = ContinuousClock.now
 var answer = ""
+var firstPiece: Double?
 for try await piece in provider.generate(messages, options: GenerationOptions()) {
+    firstPiece = firstPiece ?? seconds(since: start)
     answer += piece
     FileHandle.standardOutput.write(Data(piece.utf8))
 }
 
-let stats = await provider.statistics
+guard let builtIn else {
+    print(String(format: "\n---\nfirst text after %.2f s, total %.1f s", firstPiece ?? 0, seconds(since: start)))
+    exit(0)
+}
+
+let stats = await builtIn.statistics
 print("\n---")
 try await print(String(
     format: "context %d, load %.1f s, prompt %d tokens in %.2f s (%.0f/s), answer %d tokens in %.2f s (%.1f/s)",
-    provider.contextLength(),
+    builtIn.contextLength(),
     stats.loadSeconds,
     stats.promptTokens,
     stats.promptSeconds,
@@ -150,4 +202,4 @@ try await print(String(
 ))
 print(String(format: "total %.1f s, peak memory %.0f MB", seconds(since: start), peakMemoryMB()))
 // ggml asserts at exit if Metal still holds the model.
-await provider.unload()
+await builtIn.unload()
