@@ -189,18 +189,28 @@ func `a streamed answer is read however the connection splits it`(size: Int) asy
 
 @Test func `cancelling stops the request`() async throws {
     let base = stubEndpoint(StubEndpoint(pieces: [Data(chunk("Started").utf8)], stalls: true))
+    let received = Received()
     let consumer = Task {
         var text = ""
         for try await piece in provider(base).generate([LLMMessage(.user, "Hi")], options: GenerationOptions()) {
             text += piece
+            received.text.withLock { $0 = text }
         }
         return text
     }
-    try await waitUntil { stubbed(base).requests.count == 1 }
+    // Cancel once the first piece has reached the consumer, not just when the request has
+    // reached the server: on a slow machine the piece can still be on its way.
+    try await waitUntil { received.text.withLock { $0 } == "Started" }
+    #expect(stubbed(base).requests.count == 1)
     consumer.cancel()
     // A cancelled consumer sees the stream end, keeping what had arrived.
     #expect(try await consumer.value == "Started")
     try await waitUntil { stubbed(base).stopped == 1 }
+}
+
+/// What a consumer has read so far, for a test to wait on.
+private final class Received: Sendable {
+    let text = Mutex("")
 }
 
 // MARK: - Token estimates
