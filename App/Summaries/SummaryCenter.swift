@@ -85,6 +85,11 @@ final class SummaryCenter {
         #if DEBUG
             if ProcessInfo.processInfo.environment["MINUTES_FAKE_LLM"] == "1" {
                 return FakeLLMProvider(id: fakeModelID) { messages in
+                    if messages.first?.content.contains("You answer questions about the user's meetings") == true {
+                        // Cites the first source, and a number that doesn't exist, which is dropped.
+                        let sources = messages.last?.content.components(separatedBy: "\n[").count ?? 1
+                        return "A fake answer from \(sources - 1) sources [1]. Nothing else [9]."
+                    }
                     if let notes = messages.last?.content.components(separatedBy: "The notes to tidy up:\n").last,
                        messages.first?.content.contains("tidy up notes") == true
                     {
@@ -184,7 +189,7 @@ final class SummaryCenter {
 
     func refreshModels() {
         let downloader = downloader
-        for model in ModelCatalog.all where downloads[model.id] == nil {
+        for model in ModelCatalog.all + [SearchCenter.searchModel] where downloads[model.id] == nil {
             if downloader.isInstalled(model) {
                 states[model.id] = .installed
             } else if let partial = downloader.partial(for: model) {
@@ -249,13 +254,19 @@ final class SummaryCenter {
     /// Whether a model is in use and can't be deleted.
     func isInUse(_ model: CatalogModel) -> Bool {
         (summaryChoice == .builtIn(model.id) && queue.activity != nil) || NotesCenter.shared.isUsing(builtIn: model.id)
+            || ChatCenter.shared.isUsing(builtIn: model.id)
+            || (model.id == SearchCenter.searchModel.id && SearchCenter.shared.isUpdating)
     }
 
     func delete(_ model: CatalogModel) async {
         guard !isInUse(model), downloads[model.id] == nil else {
             return
         }
-        await BuiltInModels.shared.unload(model.id)
+        if model.id == SearchCenter.searchModel.id {
+            await SearchCenter.shared.unloadSearchModel()
+        } else {
+            await BuiltInModels.shared.unload(model.id)
+        }
         do {
             try downloader.delete(model)
         } catch {
@@ -273,6 +284,11 @@ final class SummaryCenter {
 
     private func finishDownload(of model: CatalogModel) {
         states[model.id] = .installed
+        guard model.id != SearchCenter.searchModel.id else {
+            // The search model never answers or summarizes, so it's never the default.
+            SearchCenter.shared.searchModelInstalled()
+            return
+        }
         let models = AIModelCenter.shared
         // The first model downloaded becomes the default, unless the default works already.
         if case let .builtIn(id) = models.defaultChoice, states[id] != .installed {
@@ -286,6 +302,7 @@ final class SummaryCenter {
     /// The library moved or another was chosen: its models and summaries are different.
     func libraryChanged() {
         NotesCenter.shared.libraryChanged()
+        ChatCenter.shared.libraryChanged()
         BuiltInModels.shared.forgetAll()
         refreshModels()
         templatesChanged()

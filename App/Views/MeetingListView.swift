@@ -21,7 +21,8 @@ struct MeetingListView: View {
                 ForEach(store.sections) { section in
                     Section(section.period.title) {
                         ForEach(section.entries) { entry in
-                            MeetingRow(entry: entry, dateText: section.period.dateText(for: entry.date))
+                            MeetingRow(entry: entry, dateText: section.period.dateText(for: entry.date),
+                                       snippet: SearchCenter.shared.match(for: entry)?.hit.snippet)
                                 .tag(entry.id)
                                 .contextMenu {
                                     MeetingActions(store: store, entry: entry)
@@ -42,6 +43,10 @@ struct MeetingListView: View {
                 systemImage: "waveform",
                 description: Text("Meetings you record will appear here."),
             )
+        } else if SearchCenter.shared.isSearching {
+            // Titles didn't match, and the meetings' text is still being searched.
+            ProgressView()
+                .controlSize(.small)
         } else {
             ContentUnavailableView.search(text: store.searchText)
         }
@@ -51,6 +56,8 @@ struct MeetingListView: View {
 private struct MeetingRow: View {
     let entry: MeetingEntry
     let dateText: String
+    /// Where a search matched inside the meeting, with the matched words marked.
+    let snippet: String?
 
     private var state: MeetingDisplayState {
         MeetingDisplayState(entry: entry)
@@ -74,6 +81,13 @@ private struct MeetingRow: View {
             Text(details)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            if let snippet {
+                Text(SearchSnippet.attributed(snippet))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(3)
+                    .accessibilityIdentifier("searchSnippet")
+            }
             if let badge = state.badge {
                 Text(badge)
                     .font(.caption)
@@ -146,6 +160,11 @@ struct MeetingActions: View {
         Button("Reveal in Finder") {
             store.reveal(entry)
         }
+
+        Button("Export…") {
+            store.exportRequest = entry
+        }
+        .disabled(MeetingDisplayState(entry: entry) == .recording || entry.metadata == nil)
 
         if MeetingDisplayState(entry: entry) == .ready,
            let title = TranscriptionCenter.shared.transcribeTitle(for: entry)

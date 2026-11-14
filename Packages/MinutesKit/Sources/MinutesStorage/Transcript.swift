@@ -104,7 +104,7 @@ public struct Transcript: Codable, Equatable, Sendable {
         return lines.joined(separator: "\n") + "\n"
     }
 
-    private static func clock(_ seconds: Double) -> String {
+    static func clock(_ seconds: Double) -> String {
         let total = Int(max(seconds, 0))
         let (hours, minutes, rest) = (total / 3600, total % 3600 / 60, total % 60)
         return hours > 0

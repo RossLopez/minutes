@@ -5,7 +5,7 @@ import Foundation
 extension LibraryStore {
     /// Keeps ⌘⌫ and Space away from the meeting and player while someone is typing.
     var isEditingText: Bool {
-        isEditingTitle || isEditingSearch || isEditingNotes
+        isEditingTitle || isEditingSearch || isEditingNotes || isEditingChat
     }
 
     /// Moves a file Minutes replaced to the Trash, or the UI tests' stand-in for it.

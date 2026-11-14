@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import MinutesSearch
 import SwiftUI
 
 struct MainWindowView: View {
@@ -41,16 +42,14 @@ struct MainWindowView: View {
                 case .allMeetings:
                     MeetingListView(store: store)
                 case .chat:
-                    ContentUnavailableView(
-                        "No Chats",
-                        systemImage: SidebarItem.chat.systemImage,
-                        description: Text("Chat about your past meetings arrives in Milestone 8."),
-                    )
+                    ChatListView()
                 }
             }
             .navigationSplitViewColumnWidth(min: 260, ideal: 300)
         } detail: {
-            if store.sidebarItem == .allMeetings, let entry = store.selectedEntry {
+            if store.sidebarItem == .chat {
+                ChatDetailView()
+            } else if let entry = store.selectedEntry {
                 MeetingDetailView(store: store, entry: entry)
                     .id(entry.id)
             } else {
@@ -60,7 +59,7 @@ struct MainWindowView: View {
         .searchable(
             text: Binding(get: { store.searchText }, set: { store.searchText = $0 }),
             placement: .sidebar,
-            prompt: "Search Titles",
+            prompt: "Search",
         )
         .searchFocused($isSearchFocused)
         .onChange(of: isSearchFocused) {
@@ -68,6 +67,15 @@ struct MainWindowView: View {
         }
         .onChange(of: store.searchRequests) {
             isSearchFocused = true
+        }
+        .onOpenURL { url in
+            // minutes://meeting/<id>?t=…, from a saved chat opened in another app.
+            if let link = MeetingLink(url: url) {
+                store.open(link)
+            }
+        }
+        .sheet(item: Binding(get: { store.exportRequest }, set: { store.exportRequest = $0 })) { entry in
+            ExportSheet(entry: entry)
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             Task {
@@ -90,8 +98,8 @@ struct MainWindowView: View {
                 }
             }
             .padding(16)
-            // Keeps the recording status above the player.
-            .padding(.bottom, isPlayerShowing ? 104 : 0)
+            // Keeps the recording status above the player and a chat's question bar.
+            .padding(.bottom, (isPlayerShowing ? 104 : 0) + (store.chatInputHeights.values.max() ?? 0))
         }
         .alert("Recording Consent", isPresented: .constant(!consentNoteShown)) {
             Button("OK") {

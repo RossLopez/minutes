@@ -9,7 +9,7 @@ struct MeetingDetailView: View {
     let entry: MeetingEntry
 
     /// The tab last chosen, for every meeting. Summary first.
-    @AppStorage("meeting.tab") private var tab = MeetingTab.summary
+    @AppStorage(MeetingTab.storageKey) private var tab = MeetingTab.summary
 
     private var state: MeetingDisplayState {
         MeetingDisplayState(entry: entry)
@@ -50,12 +50,15 @@ struct MeetingDetailView: View {
             .pickerStyle(.segmented)
             .labelsHidden()
             .padding(20)
-            if tab == .transcript {
-                TranscriptTab(store: store, entry: entry)
-            } else if tab == .summary {
+            switch tab {
+            case .summary:
                 SummaryTab(entry: entry)
-            } else {
+            case .transcript:
+                TranscriptTab(store: store, entry: entry)
+            case .notes:
                 NotesTab(store: store, entry: entry)
+            case .ask:
+                AskTab(entry: entry)
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -206,23 +209,5 @@ private struct MeetingHeader: View {
             notes.append("Made by a newer version of Minutes, so it can't be renamed here.")
         }
         return notes
-    }
-}
-
-private enum MeetingTab: String, CaseIterable, Identifiable {
-    case summary
-    case transcript
-    case notes
-
-    var id: Self {
-        self
-    }
-
-    var title: String {
-        switch self {
-        case .summary: "Summary"
-        case .transcript: "Transcript"
-        case .notes: "Notes"
-        }
     }
 }

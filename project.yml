@@ -53,6 +53,7 @@ targets:
           - MinutesLlama
           - MinutesStorage
           - MinutesPipeline
+          - MinutesSearch
           - MinutesFluidAudio
     scheme:
       testTargets:
