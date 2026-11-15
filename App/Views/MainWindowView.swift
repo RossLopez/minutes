@@ -43,6 +43,20 @@ struct MainWindowView: View {
                     .accessibilityIdentifier("recentlyDeleted")
                 }
             }
+            // A bar, not an overlay, so the list scrolls clear of it under the system's edge effect.
+            .safeAreaBar(edge: .bottom, alignment: .leading) {
+                SettingsLink {
+                    Label("Settings", systemImage: "gearshape")
+                        .labelStyle(.iconOnly)
+                        .font(.title3)
+                        .contentShape(.rect)
+                }
+                .buttonStyle(.borderless)
+                .help("Settings")
+                .accessibilityIdentifier("sidebarSettings")
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+            }
             .navigationSplitViewColumnWidth(min: 180, ideal: 200)
         } content: {
             Group {
