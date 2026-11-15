@@ -13,6 +13,7 @@ let package = Package(
         .library(name: "MinutesLLM", targets: ["MinutesLLM"]),
         .library(name: "MinutesStorage", targets: ["MinutesStorage"]),
         .library(name: "MinutesPipeline", targets: ["MinutesPipeline"]),
+        .library(name: "MinutesSearch", targets: ["MinutesSearch"]),
         .library(name: "MinutesFluidAudio", targets: ["MinutesFluidAudio"]),
         .library(name: "MinutesLlama", targets: ["MinutesLlama"]),
         .executable(name: "minutes-audiocheck", targets: ["minutes-audiocheck"]),
@@ -57,6 +58,13 @@ let package = Package(
         // The built-in models. Like FluidAudio, the third-party runtime gets a target of its own.
         .target(name: "MinutesLlama", dependencies: ["MinutesLLM", "llama"]),
         .target(name: "MinutesStorage"),
+        // The search index and chat's retrieval, on the system's SQLite. No UI imports, so a separate process can
+        // search the library later.
+        .target(
+            name: "MinutesSearch",
+            dependencies: ["MinutesLLM", "MinutesStorage"],
+            linkerSettings: [.linkedLibrary("sqlite3")],
+        ),
         // What happens after Stop. No UI imports, so a separate process could run it later.
         .target(
             name: "MinutesPipeline",
@@ -68,7 +76,10 @@ let package = Package(
         // Developer tool for measuring recordings. Not linked into the app.
         .executableTarget(name: "minutes-audiocheck", dependencies: ["MinutesAudio"]),
         .executableTarget(name: "minutes-diarizecheck", dependencies: ["MinutesDiarization", "MinutesFluidAudio"]),
-        .executableTarget(name: "minutes-llmcheck", dependencies: ["MinutesLLM", "MinutesLlama", "MinutesStorage"]),
+        .executableTarget(
+            name: "minutes-llmcheck",
+            dependencies: ["MinutesLLM", "MinutesLlama", "MinutesSearch", "MinutesStorage"],
+        ),
 
         .testTarget(name: "MinutesAudioRTTests", dependencies: ["MinutesAudioRT"]),
         .testTarget(
@@ -81,6 +92,7 @@ let package = Package(
         .testTarget(name: "MinutesLLMTests", dependencies: ["MinutesLLM"]),
         .testTarget(name: "MinutesLlamaTests", dependencies: ["MinutesLlama", "MinutesLLM"]),
         .testTarget(name: "MinutesStorageTests", dependencies: ["MinutesStorage"]),
+        .testTarget(name: "MinutesSearchTests", dependencies: ["MinutesSearch", "MinutesLLM", "MinutesStorage"]),
         .testTarget(name: "MinutesPipelineTests", dependencies: ["MinutesPipeline", "MinutesLLM"]),
         .testTarget(
             name: "MinutesEngineTests",

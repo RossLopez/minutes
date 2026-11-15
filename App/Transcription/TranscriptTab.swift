@@ -113,7 +113,8 @@ struct TranscriptTab: View {
                             .padding(.horizontal, 20)
                             .padding(.bottom, 12)
                     }
-                    TranscriptReader(player: store.player, document: document, editing: editing)
+                    TranscriptReader(player: store.player, document: document, editing: editing,
+                                     meetingID: entry.metadata?.id)
                 }
             } else if status == .newerVersion {
                 newerVersion
@@ -187,6 +188,17 @@ private struct TranscriptReader: View {
     let player: PlayerModel
     let document: TranscriptDocument
     let editing: SpeakerEditing
+    let meetingID: UUID?
+
+    /// The line a search result or citation asked for, with the request's token.
+    private var reveal: (line: Int, token: Int)? {
+        guard let reveal = SearchCenter.shared.reveal, reveal.meetingID == meetingID, reveal.kind == .transcript,
+              let line = document.lineID(at: (reveal.seconds ?? 0) + 0.01)
+        else {
+            return nil
+        }
+        return (line, reveal.token)
+    }
 
     var body: some View {
         TranscriptList(
@@ -194,6 +206,7 @@ private struct TranscriptReader: View {
             editing: editing,
             currentLine: document.lineID(at: player.state.currentTime),
             isPlaying: player.state.isPlaying,
+            reveal: reveal,
             onSelect: { player.seek(to: $0.start) },
             onPlay: { player.play(from: $0.start) },
         )
@@ -208,6 +221,7 @@ private struct TranscriptList: View {
     let editing: SpeakerEditing
     let currentLine: Int?
     let isPlaying: Bool
+    let reveal: (line: Int, token: Int)?
     let onSelect: (TranscriptDocument.Line) -> Void
     let onPlay: (TranscriptDocument.Line) -> Void
 
@@ -255,7 +269,22 @@ private struct TranscriptList: View {
                 // Centered, because the player bar floats over the bottom of the list.
                 proxy.scrollTo(currentLine, anchor: .center)
             }
+            .onAppear {
+                scroll(to: reveal, with: proxy)
+            }
+            .onChange(of: reveal?.token) {
+                scroll(to: reveal, with: proxy)
+            }
         }
+    }
+
+    private func scroll(to reveal: (line: Int, token: Int)?, with proxy: ScrollViewProxy) {
+        guard let reveal else {
+            return
+        }
+        lastUserScroll = nil
+        proxy.scrollTo(reveal.line, anchor: .center)
+        SearchCenter.shared.reveal = nil
     }
 }
 

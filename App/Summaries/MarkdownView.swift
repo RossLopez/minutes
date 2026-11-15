@@ -112,9 +112,12 @@ struct MarkdownBlock: Identifiable, Equatable {
 /// Renders Markdown as native, selectable text.
 struct MarkdownView: View {
     let blocks: [MarkdownBlock]
+    /// Off in chat: selectable text there crashed the app under VoiceOver (docs/NOTES.md).
+    var selectable = true
 
-    init(_ markdown: String) {
+    init(_ markdown: String, selectable: Bool = true) {
         blocks = MarkdownBlock.parse(markdown)
+        self.selectable = selectable
     }
 
     var body: some View {
@@ -123,7 +126,7 @@ struct MarkdownView: View {
                 view(for: block)
             }
         }
-        .textSelection(.enabled)
+        .modifier(SelectableText(isOn: selectable))
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
@@ -175,6 +178,19 @@ struct MarkdownView: View {
         } else {
             Text("•")
                 .accessibilityHidden(true)
+        }
+    }
+}
+
+/// `.textSelection` with a value decided at run time: `.enabled` and `.disabled` are different types.
+struct SelectableText: ViewModifier {
+    let isOn: Bool
+
+    func body(content: Content) -> some View {
+        if isOn {
+            content.textSelection(.enabled)
+        } else {
+            content.textSelection(.disabled)
         }
     }
 }

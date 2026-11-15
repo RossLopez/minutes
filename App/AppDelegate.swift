@@ -17,6 +17,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             SummaryCenter.shared.updateHold()
             SummaryCenter.shared.queue.resumeInterrupted(in: LibraryStore.shared.library)
             await SpeakerCenter.shared.refresh()
+            await ChatCenter.shared.refresh()
         }
     }
 
@@ -27,6 +28,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_: Notification) {
         NotesCenter.shared.prepareForExit()
         SummaryCenter.shared.prepareForExit()
+        SearchCenter.shared.prepareForExit()
     }
 
     /// A recording must keep going after the main window closes, and the menu bar item must stay available.

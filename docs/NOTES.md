@@ -81,6 +81,18 @@ Each track is corrected to within ±5 ms of the timeline, so the two can be up t
 
 The macOS 27 SDK marks Swift as unsupported on real-time audio threads (`__SWIFT_UNAVAILABLE_MSG` on the real-time-safe `AVAudioSinkNode` initializer). Code that runs on those threads lives in the small `MinutesAudioRT` target. Everything else is Swift.
 
+### Search by meaning uses EmbeddingGemma 2, an optional download (Nov 14, 2026)
+
+Ross chose EmbeddingGemma 2 (Q8_0, 310 MB, Apache 2.0) over Apple's `NLContextualEmbedding`. It runs on the llama.cpp build the app already has. The measurements below agree: Apple's English embedding found 6 of 15 answers in its top 5, EmbeddingGemma 9. Vectors are cut to 256 of 768 dimensions. Full width scored the same on the retrieval set and is three times the size. Without the model, search and chat use keywords only.
+
+### Chat logic lives in `MinutesSearch` (Nov 14, 2026)
+
+The plan put chat prompts, context fitting and citations in `MinutesLLM`. They need the search index, so they're in `MinutesSearch`, which depends on `MinutesLLM`. `MinutesLLM` stays free of storage. `MinutesSearch` imports no UI framework, so the roadmap's MCP server could answer from a separate process.
+
+### Rank fusion uses k = 5, not 60 (Nov 14, 2026)
+
+The plan said reciprocal rank fusion with the usual k = 60. On the AMI meetings that ranked a passage that both lists put in the middle above one that either list put first. Every passage of a project repeats its words, like "remote" here, so the middle of both lists is mostly noise. "What will the remote sell for?" was first by keywords and outside the top 20 after fusion. With k = 5, hybrid's hit@10 rose from 0.60 to 0.80 and beat either list alone. k = 2 scored about the same. With only 15 questions about one project, this is worth measuring again on a real library.
+
 ## Milestone 1 measurements
 
 Measured on a MacBook Pro on macOS 27.0.1 with `minutes-audiocheck` and a generated signal played by `afplay`, on Nov 5, 2026. "Lag" is how far the mic trails the system track.
@@ -289,6 +301,47 @@ On the M5 Pro with 24 GB, release `minutes-llmcheck --notes` with the built-in r
 - **Quality:** the 12B keeps all 16 points with the right people and expands shorthand from the transcript. E4B still drops one note (the black-and-white LCD), adds one point from the transcript, and writes placeholder action items, so the 12B stays the recommended model.
 - **Through the app,** with fake audio, transcription and model: notes typed while recording saved within a second with their times in the margin, list items continued on Return, the HUD's Notes button came back to the recording, clicking a margin time played from there, a cleanup started during a recording waited for it and for transcription, and Accept wrote `notes-cleaned.md`, moved the previous one to the Trash and showed the cleaned-up notes.
 - **Privacy:** the app's notes log holds only error types. `notes.json` holds fingerprints and times, no text.
+
+## Milestone 8 measurements (Nov 14, 2026)
+
+On the M5 Pro with 24 GB, release `minutes-llmcheck` with the built-in runtime unless noted. The library is AMI ES2004a–d with their manual transcripts: 1,833 lines, about 29,000 words, 121 passages of about 200 words.
+
+**Indexing**
+
+- **Keywords:** 0.03 s for the four meetings.
+- **EmbeddingGemma 2:** 121 passages, 40k tokens, in 1.8–2.0 s (62–66 passages a second). The model loads in 0.2 s, with a peak footprint of 291–307 MB.
+- **Size:** the index with its vectors is 0.86 MB.
+- **Vectors match llama-server's** `/v1/embeddings` on the same file at cosine 1.000000, including passages batched together.
+- **Searches** take 1 ms by keywords, 9 ms by meaning and about 21 ms for both, including embedding the question.
+
+**Retrieval.** 15 questions with known answers, worded unlike the transcript where possible, such as "How will someone find the remote when it goes missing?". A question counts as answered when a result is a transcript passage overlapping the answer's time. The questions are in `minutes-llmcheck`'s format, described in `Search.swift`.
+
+| Search | hit@1 | hit@5 | hit@10 | hit@20 | MRR@10 |
+| --- | --- | --- | --- | --- | --- |
+| Keywords only | 0.40 | 0.60 | 0.73 | 0.80 | 0.50 |
+| EmbeddingGemma 2 only | 0.40 | 0.60 | 0.67 | 0.80 | 0.48 |
+| Both, k = 60 | 0.40 | 0.60 | 0.60 | 0.80 | 0.45 |
+| **Both, k = 5 (shipped)** | **0.47** | **0.60** | **0.80** | **0.87** | **0.55** |
+| Apple `NLContextualEmbedding` only | 0.27 | 0.40 | 0.53 | 0.67 | 0.32 |
+| Keywords and Apple, k = 5 | 0.13 | 0.73 | 0.73 | 0.87 | 0.37 |
+
+- **Each side finds different answers.** Keywords and EmbeddingGemma each found 9 of 15 in their top 5, and 12 between them.
+- **Smaller passages (120 or 80 words) and full-width vectors** moved the numbers by one question either way, so 200 words and 256 dimensions stay.
+- **Chat sends about 24 passages,** so hit@20 is closest to what the model sees.
+- **What still fails:** "How will the remote be powered?" is never found by its first result, though the 12B found the kinetic charger among its 24 sources. "Which devices should the remote work with?" (TV only) isn't found at all.
+
+**Answers.** Four questions, the last with no answer in the meetings. Each prompt was 24 sources, about 8.6k tokens.
+
+| Model | First text | Answer | Peak memory |
+| --- | --- | --- | --- |
+| E4B | 2.4–2.6 s | 3–4 s | 986 MB |
+| 12B | 10.5–10.9 s | 11–20 s | 1,398 MB |
+| 12B through llama-server (`-c 32768 -np 1`) | 10.5–11.1 s | 11–20 s | |
+
+- **The 12B** cited every claim. It found the kinetic-charger decision and the change it considered back to batteries. It listed the bleep, speech recognition and clip-on ideas for finding a lost remote. It answered the Japan question with "I couldn't find it in the meetings." Its one miss: for the price it gave the team's guess in pounds, not the €25 they were given.
+- **E4B** cited too, but got facts wrong. "Twelve fifty" became "$1.25", and it left the kinetic charger out of the power answer from the same sources. For the Japan question it said the meetings don't say, then added Japan facts from the sources.
+- **Through llama-server** the 12B's answers matched the built-in run's word for word.
+- **The 12B stays the recommended model** for chat, as for summaries and cleanup.
 
 ## Apple API notes
 
@@ -542,6 +595,9 @@ These are llama.cpp's rather than Apple's, kept here so the next upgrade checks 
 - **The sliding-window cache defaults to full size.** `llama_context_default_params` sets `swa_full`, so Gemma's sliding-window layers, most of the model, keep cache for the whole context. On the 12B at 32K that made the footprint 11.5 GB. With other apps open, this 24 GB Mac swapped, wrote at 2 tokens/s, and the 2-hour summary failed with `llama_decode` error -3. Minutes clears the cache before each prompt and runs one conversation at a time, so it sets `swa_full = false`. The 12B then needs 1.3 GB beside its mapped weights.
 - **Gemma 4 templates differ between sizes.** With thinking off, the 12B's template ends the prompt with an empty thought block, `<|channel>thought\n<channel|>`, and E2B's and E4B's don't. Without it the 12B writes that block at the start of every answer, as plain text. `ChatFormat` adds the block when the template has it, and the real-model test checks that no marker reaches the summary.
 
+- **EmbeddingGemma's end token comes with its start token.** Tokenizing with the start token added also adds `<eos>`, because the model's `add_eos_token` is set. Adding `<eos>` by hand as well gave vectors 0.99 cosine from llama-server's. With one, they match exactly. When a passage is cut to fit, the end token is kept.
+- **Embedding needs its own context,** with `embeddings` on, the pooling the GGUF names, and `n_ubatch` as large as `n_batch`. Attention isn't causal, so a passage can't be split across batches.
+
 ### llama-server b12110 (Nov 11, 2026)
 
 - **It lets Gemma 4 think by default** (`--reasoning auto`) and moves the thoughts to `reasoning_content`. `reasoning_effort: "none"` or `chat_template_kwargs: {"enable_thinking": false}` turns that off per request.
@@ -550,3 +606,24 @@ These are llama.cpp's rather than Apple's, kept here so the next upgrade checks 
 - **It answers at its root as well as under `/v1`,** so an address without `/v1` works as typed.
 - **`/v1/models` gives each model's `meta.n_ctx`,** as does `/props` under `default_generation_settings`.
 - **A prompt longer than the context is a 400** with `type: exceed_context_size_error`, sent before any stream starts.
+
+### An identifier on a container hides its buttons' identifiers (Nov 14, 2026)
+
+The chat's source list had `.accessibilityIdentifier("chatSources")` on its `VStack`, and its toggle and source buttons had their own. UI tests found none of the buttons by their identifiers until the container's was removed. The outer identifier seems to be applied to the children in place of theirs. Put identifiers on the elements tests look for, not on the stacks around them.
+
+### Selectable text in a changing scroll view crashes under accessibility (Nov 14, 2026)
+
+In the chat view, `Text` and Markdown with `.textSelection(.enabled)`, inside a `ScrollView` whose content changes as an answer arrives, crashed the app. It happened as soon as an accessibility client read the window, which VoiceOver does constantly. The crash is a stack overflow:
+
+- `AccessibilityNode.accessibilityLabel()` asks its platform element for the label.
+- The platform element's override, through `applyProperties(to:)`, asks the same node again.
+- This repeats until the stack runs out, in `CFDictionaryGetValue`.
+
+It doesn't happen while the content is still, so a saved chat opened and read is fine. It happens when a pending answer appears or the view scrolls to it.
+
+Hiding the pending turn and turning off the scroll both stopped it. So did turning off text selection with everything else left in. Nothing else I removed helped: the custom accessibility labels, the citation links, the `LazyVStack`, the multi-line text field, the header and the toolbar.
+
+- **Workaround:** chat questions and answers aren't selectable. Each has Copy in its context menu, and the Summary tab's Copy button covers summaries.
+- **Summary tab:** it streams into the same selectable Markdown view, but regenerating a summary while reading the window didn't crash. Watch for it there.
+- **How to reproduce:** read the window's accessibility tree, for example with the computer-use tool or Accessibility Inspector, right after pressing Ask.
+- **Debugger:** the debugger can't name the node, because expressions need stack the crashed thread no longer has.

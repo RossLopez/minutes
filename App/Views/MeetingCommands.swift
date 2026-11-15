@@ -25,6 +25,13 @@ struct MeetingCommands: Commands {
         }
 
         CommandGroup(after: .newItem) {
+            Button("New Chat") {
+                ChatCenter.shared.newChat()
+            }
+            .keyboardShortcut("n", modifiers: [.command, .shift])
+
+            Divider()
+
             Button("Rename Meeting") {
                 if let entry = store.selectedEntry {
                     store.requestRename(of: entry)
@@ -39,6 +46,12 @@ struct MeetingCommands: Commands {
             }
             .keyboardShortcut("r", modifiers: [.command, .shift])
             .disabled(store.selectedEntry == nil)
+
+            Button("Export…") {
+                store.exportRequest = store.selectedEntry
+            }
+            .keyboardShortcut("e")
+            .disabled(store.selectedEntry?.metadata == nil || !store.canActOnSelection)
 
             Button(transcribeEntry.flatMap(center.transcribeTitle) ?? "Transcribe") {
                 if let transcribeEntry {

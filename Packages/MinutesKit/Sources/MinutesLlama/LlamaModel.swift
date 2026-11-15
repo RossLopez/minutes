@@ -99,6 +99,10 @@ final class LlamaModel {
     }
 
     func tokenize(_ text: String, addStart: Bool, special: Bool) throws -> [llama_token] {
+        try Self.tokenize(text, vocab: vocab, addStart: addStart, special: special)
+    }
+
+    static func tokenize(_ text: String, vocab: OpaquePointer, addStart: Bool, special: Bool) throws -> [llama_token] {
         let length = Int32(text.utf8.count)
         var tokens = [llama_token](repeating: 0, count: Int(length) + 8)
         var count = llama_tokenize(vocab, text, length, &tokens, Int32(tokens.count), addStart, special)

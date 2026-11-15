@@ -147,6 +147,7 @@ final class NotesCenter {
             try folder.saveNotes(MeetingNotes(text: document.text, times: document.times, cleaned: document.cleaned))
             document.diskDate = NotesDocument.modificationDate(of: folder.notesFile)
             document.saveFailure = nil
+            SearchCenter.shared.scheduleUpdate()
         } catch {
             Self.logger.error("Saving notes failed: \(String(describing: type(of: error)), privacy: .public)")
             document.saveFailure = "Minutes couldn't save your notes. They're kept here and saved again as you type."
@@ -224,5 +225,6 @@ extension NotesCenter {
     /// After a cleanup is accepted, so the document shows it.
     func cleanedNotesSaved(for document: NotesDocument) {
         reload(document)
+        SearchCenter.shared.scheduleUpdate()
     }
 }

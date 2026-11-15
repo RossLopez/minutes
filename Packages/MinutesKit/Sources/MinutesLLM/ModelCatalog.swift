@@ -96,6 +96,17 @@ public enum ModelCatalog {
         ),
     ]
 
+    /// For search by meaning, not for writing, so it's never offered as a chat or summary model.
+    /// Google's EmbeddingGemma 2 under the Apache License 2.0, as ggml-org's GGUF.
+    public static let embeddingGemma2 = CatalogModel(
+        id: "embeddinggemma-2",
+        name: "EmbeddingGemma 2",
+        repository: "ggml-org/embeddinggemma-2-GGUF",
+        file: "embeddinggemma-2-Q8_0.gguf",
+        approximateBytes: 309_855_456,
+        recommendedMemoryGB: 8,
+    )
+
     /// The model offered first: the 12B where there's memory for it, and E4B otherwise.
     public static func recommended(forMemory bytes: UInt64 = ProcessInfo.processInfo.physicalMemory) -> CatalogModel {
         gemma12B.fitsMemory(bytes) ? gemma12B : gemmaE4B

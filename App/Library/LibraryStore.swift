@@ -27,15 +27,22 @@ final class LibraryStore {
     private(set) var isMovingLibrary = false
     /// Goes up when a menu command asks the open meeting's title field to take focus.
     private(set) var renameRequests = 0
+    /// The meeting the export sheet is open for.
+    var exportRequest: MeetingEntry?
     var sidebarItem = SidebarItem.allMeetings
     /// Goes up when ⌘F asks the search field to take focus.
     private(set) var searchRequests = 0
     var isEditingTitle = false
     var isEditingSearch = false
     var isEditingNotes = false
+    var isEditingChat = false
+    /// How tall each showing chat's question bar is, by chat, so the recording HUD and banners
+    /// sit above it rather than over it.
+    var chatInputHeights: [UUID: CGFloat] = [:]
     var searchText = "" {
         didSet {
             rebuildSections()
+            SearchCenter.shared.search(searchText)
         }
     }
 
@@ -127,23 +134,31 @@ final class LibraryStore {
             selection = nil
         }
         syncPlayer()
+        // Whatever changed on disk, the search index catches up with it.
+        SearchCenter.shared.scheduleUpdate()
     }
 
-    func select(_ url: URL?) {
+    /// - Parameter revealingMatch: while searching, show the meeting where its text matched.
+    func select(_ url: URL?, revealingMatch: Bool = true) {
         guard url != selection else {
             return
         }
         selection = url
         syncPlayer()
+        if revealingMatch {
+            revealSearchMatch()
+        }
     }
 
-    private func rebuildSections() {
-        let matching = entries.filter { $0.matches(search: searchText) }
+    /// Titles match straight away. Text inside meetings matches once the index has answered.
+    func rebuildSections() {
+        let search = SearchCenter.shared
+        let matching = entries.filter { $0.matches(search: searchText) || search.match(for: $0) != nil }
         sections = MeetingGrouping.sections(for: matching, now: Date())
     }
 
     /// Only a finished meeting that nothing is writing to has audio to open.
-    private func syncPlayer() {
+    func syncPlayer() {
         guard let entry = selectedEntry, entry.metadata?.state == .complete, !isActive(entry) else {
             player.unload()
             return
@@ -368,29 +383,6 @@ extension LibraryStore {
                 message: LibraryAlerts.message(for: error),
             )
             await refresh()
-        }
-    }
-}
-
-enum SidebarItem: String, CaseIterable, Identifiable {
-    case allMeetings
-    case chat
-
-    var id: Self {
-        self
-    }
-
-    var title: String {
-        switch self {
-        case .allMeetings: "All Meetings"
-        case .chat: "Chat"
-        }
-    }
-
-    var systemImage: String {
-        switch self {
-        case .allMeetings: "waveform"
-        case .chat: "bubble.left.and.bubble.right"
         }
     }
 }

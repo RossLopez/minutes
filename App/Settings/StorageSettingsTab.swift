@@ -41,6 +41,8 @@ struct StorageSettingsTab: View {
                 Text("Meetings stay on this Mac as plain files you can open without Minutes.")
             }
 
+            SearchIndexSection()
+
             Section("Disk Used") {
                 if let usage {
                     row("Audio", usage.audio)
@@ -63,5 +65,52 @@ struct StorageSettingsTab: View {
 
     private func row(_ title: String, _ bytes: Int64) -> some View {
         LabeledContent(title, value: bytes.formatted(.byteCount(style: .file)))
+    }
+}
+
+/// How much of the library search has indexed, and rebuilding it.
+private struct SearchIndexSection: View {
+    private var search: SearchCenter {
+        .shared
+    }
+
+    private var summary: String {
+        guard let status = search.status else {
+            return "Not built yet"
+        }
+        var text = status.meetings == 1 ? "1 meeting" : "\(status.meetings) meetings"
+        if search.hasSearchModel {
+            text += status.embedded < status.chunks
+                ? " · Search by meaning: \(status.embedded) of \(status.chunks) passages"
+                : " · Search by meaning on"
+        } else {
+            text += " · Searching by words only"
+        }
+        return text
+    }
+
+    var body: some View {
+        Section {
+            LabeledContent("Search index") {
+                HStack(spacing: 8) {
+                    if search.isUpdating {
+                        ProgressView().controlSize(.small)
+                    }
+                    Text(summary)
+                        .accessibilityIdentifier("searchIndexStatus")
+                }
+            }
+            HStack {
+                Spacer()
+                Button("Rebuild Index") {
+                    Task {
+                        await search.rebuild()
+                    }
+                }
+                .accessibilityIdentifier("rebuildIndex")
+            }
+        } footer: {
+            Text("The index is built from your meeting files and kept in the library's hidden .minutes folder.")
+        }
     }
 }

@@ -174,6 +174,11 @@ extension NotesCenter {
         cleanups.values.contains { $0 !== run && $0.phase == .writing }
     }
 
+    /// Whether any cleanup is being written, which a chat answer waits for.
+    var isWritingCleanup: Bool {
+        cleanups.values.contains { $0.phase == .writing }
+    }
+
     /// Whether a cleanup is waiting or being written, which keeps the library from moving.
     var isBusy: Bool {
         cleanups.values.contains(where: \.isRunning)

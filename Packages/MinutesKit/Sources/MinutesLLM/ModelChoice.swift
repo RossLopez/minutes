@@ -66,9 +66,9 @@ public enum AIFeature: String, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    /// Whether this version of Minutes uses the choice yet.
+    /// Whether this version of Minutes uses the choice yet. Every feature does since Milestone 8.
     public var isAvailable: Bool {
-        self != .chat
+        true
     }
 }
 

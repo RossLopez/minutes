@@ -13,6 +13,11 @@ import MinutesStorage
 //   minutes-llmcheck <model.gguf> --summarize <meeting folder>... [--context <tokens>]
 //   minutes-llmcheck <model.gguf> --notes <file> --summarize <meeting folder>... [--context <tokens>]
 //   minutes-llmcheck --endpoint <base URL> [--model <name>] (--prompt <text> | --summarize <folder>...)
+//   minutes-llmcheck <embedding.gguf> --embed <file of passages, one per line>
+//   minutes-llmcheck --library <root> (--index | --retrieval <questions.json>) [--embedder <gguf>]
+//   minutes-llmcheck <model.gguf> --library <root> --ask <question> [--embedder <gguf>]
+//
+// The search checks are described in Search.swift.
 //
 // --endpoint runs the same prompts on an OpenAI-compatible server, such as llama-server, for
 // comparing with the built-in runtime. Its key, if it needs one, is read from MINUTES_ENDPOINT_KEY.
@@ -76,10 +81,42 @@ let system = option("--system", in: &arguments)
 let notesFile = option("--notes", in: &arguments)
 let showTemplate = arguments.contains("--template")
 arguments.removeAll { $0 == "--template" }
+let libraryRoot = option("--library", in: &arguments)
+let embedderOption = option("--embedder", in: &arguments)
+let indexFileOption = option("--index-file", in: &arguments)
+let meetingOption = option("--meeting", in: &arguments)
+let question = option("--ask", in: &arguments)
+let questionsFile = option("--retrieval", in: &arguments)
+let buildIndex = arguments.contains("--index")
+arguments.removeAll { $0 == "--index" }
 var folders: [URL] = []
 if let index = arguments.firstIndex(of: "--summarize") {
     folders = arguments[(index + 1)...].map { URL(fileURLWithPath: $0) }
     arguments.removeSubrange(index...)
+}
+
+if let linesFile = option("--embed", in: &arguments), arguments.count == 1 {
+    try await runEmbedCheck(model: URL(fileURLWithPath: arguments[0]), linesFile: linesFile)
+    exit(0)
+}
+
+let searchOptions = try libraryRoot.map { root in
+    try SearchCheckOptions(
+        library: MinutesLibrary(root: URL(fileURLWithPath: root)),
+        indexFile: indexFileOption.map { URL(fileURLWithPath: $0) },
+        embedder: makeEmbedder(embedderOption),
+    )
+}
+
+if let searchOptions, question == nil {
+    if let questionsFile {
+        try await runRetrievalCheck(searchOptions, questionsFile: questionsFile)
+    } else if buildIndex {
+        try await runIndexCheck(searchOptions)
+    } else {
+        fail("--library needs --index, --retrieval <questions.json> or --ask <question>")
+    }
+    exit(0)
 }
 
 guard arguments.count == (endpoint == nil ? 1 : 0), endpoint == nil || !showTemplate else {
@@ -114,6 +151,11 @@ let provider: any LLMProvider = if let endpoint {
     }()
 } else {
     LlamaProvider(id: "check", modelURL: URL(fileURLWithPath: arguments[0]), contextLength: contextOption ?? 32768)
+}
+
+if let searchOptions, let question {
+    try await runAskCheck(searchOptions, question: question, meeting: meetingOption, provider: provider)
+    exit(0)
 }
 
 let builtIn = provider as? LlamaProvider

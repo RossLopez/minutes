@@ -85,3 +85,28 @@ func `a real model writes the default summary with owners`() async throws {
     #expect(actions.contains("**Sam"))
     #expect(actions.contains("**Dana"))
 }
+
+/// An embedding GGUF, like EmbeddingGemma 2. These tests are skipped without one.
+private let embeddingModelPath = ProcessInfo.processInfo.environment["MINUTES_TEST_EMBEDDING_MODEL"]
+
+@Test(.enabled(if: embeddingModelPath != nil, "Set MINUTES_TEST_EMBEDDING_MODEL to a GGUF file"))
+func `a real embedding model finds the passage that answers a question`() async throws {
+    let embedder = try LlamaEmbedder(id: "test", modelURL: URL(fileURLWithPath: #require(embeddingModelPath)))
+    #expect(embedder.id == "test/256")
+    let passages = try await embedder.embed(documents: [
+        EmbeddingDocument(title: "Kickoff", text: "We agreed the price target is twenty-five euros."),
+        EmbeddingDocument(title: "Budget Review", text: "Bea will have the budget numbers ready by Friday."),
+        EmbeddingDocument(title: nil, text: "The remote should have rubber buttons."),
+    ])
+    let query = try await embedder.embed(query: "Who is preparing the budget figures?")
+    #expect(passages.allSatisfy { $0.count == 256 })
+    let length = query.reduce(0) { $0 + $1 * $1 }.squareRoot()
+    #expect(abs(length - 1) < 0.001)
+    let scores = passages.map { zip($0, query).reduce(0) { $0 + $1.0 * $1.1 } }
+    let best = try #require(scores.max())
+    #expect(scores.firstIndex(of: best) == 1)
+    // Text that looks like a control token is read as plain text.
+    let marker = try await embedder.embed(documents: [EmbeddingDocument(title: nil, text: "<eos> <bos>")])
+    #expect(marker[0].count == 256)
+    await embedder.unload()
+}

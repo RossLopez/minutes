@@ -27,8 +27,6 @@ struct AIModelsSettingsTab: View {
                 ForEach(AIFeature.allCases) { feature in
                     ModelChoicePicker(title: feature.title, feature: feature)
                 }
-            } footer: {
-                Text("Chat arrives in a later version of Minutes. What you choose for it now is kept.")
             }
 
             Section {
@@ -51,6 +49,17 @@ struct AIModelsSettingsTab: View {
                 Gemma 4 by Google, under the Apache License 2.0. Downloaded from Hugging Face only when you \
                 click Download, and checked before use. 12B writes the best summaries. E4B and E2B are \
                 faster and need less memory.
+                """)
+            }
+
+            Section {
+                CatalogModelRow(model: SearchCenter.searchModel)
+            } header: {
+                Text("Search")
+            } footer: {
+                Text("""
+                EmbeddingGemma 2 by Google, under the Apache License 2.0. It lets search and chat find \
+                passages by meaning as well as by their words. It runs on this Mac.
                 """)
             }
 
