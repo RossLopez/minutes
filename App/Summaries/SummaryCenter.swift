@@ -84,7 +84,9 @@ final class SummaryCenter {
     private static func makeFakeProvider() -> (any LLMProvider)? {
         #if DEBUG
             if ProcessInfo.processInfo.environment["MINUTES_FAKE_LLM"] == "1" {
-                return FakeLLMProvider(id: fakeModelID) { messages in
+                // The screenshots name it as a real model would be named.
+                let id = ProcessInfo.processInfo.environment["MINUTES_FAKE_LLM_NAME"] ?? fakeModelID
+                return FakeLLMProvider(id: id) { messages in
                     if messages.first?.content.contains("You answer questions about the user's meetings") == true {
                         // Cites the first source, and a number that doesn't exist, which is dropped.
                         let sources = messages.last?.content.components(separatedBy: "\n[").count ?? 1

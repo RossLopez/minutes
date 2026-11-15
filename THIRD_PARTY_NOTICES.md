@@ -42,6 +42,147 @@ The above copyright notice and this permission notice shall be included in all c
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+### Sparkle 2.10.1
+
+Checks for and installs updates to Minutes downloaded from GitHub, when updates are on. It's turned off for copies installed with Homebrew. Under the MIT License, with parts under the BSD, MIT and zlib licenses, as its license file says:
+
+```text
+Copyright (c) 2006-2013 Andy Matuschak.
+Copyright (c) 2009-2013 Elgato Systems GmbH.
+Copyright (c) 2011-2014 Kornel Lesiński.
+Copyright (c) 2015-2017 Mayur Pawashe.
+Copyright (c) 2014 C.W. Betts.
+Copyright (c) 2014 Petroules Corporation.
+Copyright (c) 2014 Big Nerd Ranch.
+All rights reserved.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software is furnished to do so,
+subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+=================
+EXTERNAL LICENSES
+=================
+
+bspatch.c and bsdiff.c, from bsdiff 4.3 <http://www.daemonology.net/bsdiff/>:
+
+Copyright 2003-2005 Colin Percival
+All rights reserved
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted providing that the following conditions 
+are met:
+1. Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright
+   notice, this list of conditions and the following disclaimer in the
+   documentation and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
+IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+
+--
+
+sais.c and sais.h, from sais-lite (2010/08/07) <https://sites.google.com/site/yuta256/sais>:
+
+The sais-lite copyright is as follows:
+
+Copyright (c) 2008-2010 Yuta Mori All Rights Reserved.
+
+Permission is hereby granted, free of charge, to any person
+obtaining a copy of this software and associated documentation
+files (the "Software"), to deal in the Software without
+restriction, including without limitation the rights to use,
+copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
+
+--
+
+Portable C implementation of Ed25519, from https://github.com/orlp/ed25519
+
+Copyright (c) 2015 Orson Peters <orsonpeters@gmail.com>
+
+This software is provided 'as-is', without any express or implied warranty. In no event will the
+authors be held liable for any damages arising from the use of this software.
+
+Permission is granted to anyone to use this software for any purpose, including commercial
+applications, and to alter it and redistribute it freely, subject to the following restrictions:
+
+1. The origin of this software must not be misrepresented; you must not claim that you wrote the
+   original software. If you use this software in a product, an acknowledgment in the product
+   documentation would be appreciated but is not required.
+
+2. Altered source versions must be plainly marked as such, and must not be misrepresented as
+   being the original software.
+
+3. This notice may not be removed or altered from any source distribution.
+
+--
+
+SUSignatureVerifier.m:
+
+Copyright (c) 2011 Mark Hamlin.
+
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted providing that the following conditions
+are met:
+1. Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright
+   notice, this list of conditions and the following disclaimer in the
+   documentation and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
+IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+```
+
 ## Downloaded when you ask
 
 These models aren't in the app. Settings → Transcription downloads them from Hugging Face into `~/Minutes/Models` when you click Download.
@@ -60,6 +201,12 @@ These models aren't in the app. Settings → Transcription downloads them from H
   - Federico Landini, Ján Profant, Mireia Diez and Lukáš Burget, "Bayesian HMM clustering of x-vector sequences (VBx) in speaker diarization", Computer Speech & Language, 2022.
 
 - **Gemma 4 summary models** (12B, E4B, E2B, 26B A4B and 31B, instruction-tuned, quantization-aware trained, Q4_0 GGUF), by Google, under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0), printed at the end of this file. Settings → AI Models downloads the one you choose from Google's repositories, such as <https://huggingface.co/google/gemma-4-12B-it-qat-q4_0-gguf>. Minutes doesn't download their vision files.
+
+- **EmbeddingGemma 2** (Q8_0 GGUF), by Google, under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0), printed at the end of this file. Finds passages by meaning for search and chat. Settings → AI Models downloads it from ggml-org's repository, <https://huggingface.co/ggml-org/embeddinggemma-2-GGUF>.
+
+## Used only to build releases
+
+Not part of the app. The release script makes the DMG with **dmgbuild** 1.6.7 and its **ds-store** 1.3.3 and **mac-alias** 2.2.3, by Alastair Houghton, under the MIT License. <https://github.com/dmgbuild/dmgbuild>
 
 ## Apache License 2.0
 

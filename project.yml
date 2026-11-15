@@ -13,7 +13,8 @@ options:
 
 configFiles:
   Debug: Config/Signing.xcconfig
-  Release: Config/Signing.xcconfig
+  # Release adds the update key to the signing settings.
+  Release: Config/Release.xcconfig
 
 settings:
   base:
@@ -24,6 +25,11 @@ settings:
 packages:
   MinutesKit:
     path: Packages/MinutesKit
+  # MIT, with BSD, MIT and zlib parts listed in THIRD_PARTY_NOTICES.md. Checks for and installs
+  # updates from the appcast on GitHub Releases. An exact version, so an update is a reviewed change.
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: 2.10.1
 
 targets:
   Minutes:
@@ -36,11 +42,13 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.github.rosslopez.minutes
-        MARKETING_VERSION: 0.0.1
+        MARKETING_VERSION: 0.1.0
         CURRENT_PROJECT_VERSION: 1
         GENERATE_INFOPLIST_FILE: NO
         INFOPLIST_FILE: App/Info.plist
         CODE_SIGN_ENTITLEMENTS: App/Minutes.entitlements
+        # App/AppIcon.icon, made in Icon Composer's format. actool builds the icon and Assets.car from it.
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ENABLE_HARDENED_RUNTIME: YES
         ENABLE_APP_SANDBOX: NO
     dependencies:
@@ -55,6 +63,7 @@ targets:
           - MinutesPipeline
           - MinutesSearch
           - MinutesFluidAudio
+      - package: Sparkle
     scheme:
       testTargets:
         - MinutesUITests
@@ -71,3 +80,8 @@ targets:
         CODE_SIGN_ENTITLEMENTS: AppUITests/MinutesUITests.entitlements
     dependencies:
       - target: Minutes
+      # ScreenshotUITests writes its demo library in the real format.
+      - package: MinutesKit
+        products:
+          - MinutesSearch
+          - MinutesStorage

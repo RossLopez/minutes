@@ -1,0 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security problem
+    url: https://github.com/RossLopez/minutes/security/advisories/new
+    about: Privately, so it can be fixed before it's public.

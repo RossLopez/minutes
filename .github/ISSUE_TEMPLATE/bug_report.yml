@@ -1,0 +1,61 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Bug report
+description: Something in Minutes doesn't work as it should.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please don't attach recordings, transcripts, notes or summaries from real meetings. For a security problem, use SECURITY.md instead.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what happened, and what you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Click Record
+        2. …
+  - type: input
+    id: version
+    attributes:
+      label: Minutes version
+      description: Minutes › About Minutes.
+      placeholder: 0.1.0 (123)
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: Installed from
+      options:
+        - The DMG from GitHub
+        - Homebrew
+        - Built from source
+    validations:
+      required: true
+  - type: input
+    id: mac
+    attributes:
+      label: Mac and macOS version
+      placeholder: MacBook Pro M4, macOS 27.1
+    validations:
+      required: true
+  - type: textarea
+    id: setup
+    attributes:
+      label: Audio and model setup
+      description: If it's about recording or AI, the microphone and output you used, the transcription engine, and the summary model or server.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: |
+        Minutes' logs hold timings, errors and IDs, never meeting content. To collect them, run this in Terminal, reproduce the problem, then press Control-C:
+        `log stream --predicate 'subsystem == "io.github.rosslopez.minutes"' --level info`
+      render: text

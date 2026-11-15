@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Feature request
+description: An idea for Minutes.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Minutes stays fully local, needs no account, and never joins or automates a meeting app. Ideas that keep to those are the ones it can take on.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you're trying to do
+      description: The problem or situation, more than the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you do now instead

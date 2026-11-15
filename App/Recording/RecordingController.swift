@@ -311,7 +311,11 @@ extension RecordingController {
 
     func openSettings(_ tab: SettingsTab) {
         UserDefaults.standard.set(tab.rawValue, forKey: SettingsTab.storageKey)
-        settingsRequests += 1
+        if MenuBarPreferences.shared.showsIcon || isRecording {
+            settingsRequests += 1
+        } else {
+            MenuBarPreferences.openSettingsFromAppMenu()
+        }
     }
 
     /// Capture never competes with transcribing or summarizing, and saving a recording needs the disk.
