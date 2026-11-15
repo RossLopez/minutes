@@ -4,6 +4,10 @@ All notable changes to Minutes are listed here. The format follows [Keep a Chang
 
 ## [Unreleased]
 
+### Fixed
+
+- The app in the DMG now passes `codesign --verify --strict`. Making the DMG added a Finder attribute that the strict check rejects, though macOS and updates accepted the app.
+
 ## [0.1.0] - 2026-11-15
 
 The first release.

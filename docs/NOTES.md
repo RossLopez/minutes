@@ -684,3 +684,7 @@ dmgbuild runs `settings.py` with `exec`, so `__file__` isn't defined and paths c
 ### Finder's bottom bar covers the bottom of a DMG window (Nov 14, 2026)
 
 On macOS 27, Finder draws its path and status bar over the bottom of the window even when the DMG's settings hide them, covering the text at the bottom of the background. The window is 440 points tall for a 400-point background, with the icons and text placed in the top part.
+
+### dmgbuild's `hide_extensions` breaks a strict signature check (Nov 15, 2026)
+
+`hide_extensions` sets the hidden-extension flag in a `com.apple.FinderInfo` attribute on the app inside the DMG, after the app is signed. `codesign --verify --strict` then rejects the bundle with "resource fork, Finder information, or similar detritus not allowed", and a drag install copies the attribute along. Gatekeeper, plain `codesign --verify` and Sparkle 2.10.1 (which validates without `kSecCSStrictValidate`) all still accept it, so 0.1.0 shipped with it. The settings no longer hide the extension, which Finder hides for apps anyway, and `build-release.sh` now mounts the finished DMG and runs the strict check on the app inside, so CI catches anything like it.
