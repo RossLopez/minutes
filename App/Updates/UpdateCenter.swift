@@ -59,7 +59,9 @@ final class UpdateCenter {
     /// Starts the updater. Called once at launch.
     func start() {
         guard let controller else {
-            Self.logger.info("Updates off: \(String(describing: self.availability), privacy: .public)")
+            // A local, because SwiftFormat versions disagree about `self` in a log message.
+            let reason = String(describing: availability)
+            Self.logger.info("Updates off: \(reason, privacy: .public)")
             return
         }
         controller.startUpdater()
