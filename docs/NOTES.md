@@ -684,3 +684,7 @@ dmgbuild runs `settings.py` with `exec`, so `__file__` isn't defined and paths c
 ### Finder's bottom bar covers the bottom of a DMG window (Nov 14, 2026)
 
 On macOS 27, Finder draws its path and status bar over the bottom of the window even when the DMG's settings hide them, covering the text at the bottom of the background. The window is 440 points tall for a 400-point background, with the icons and text placed in the top part.
+
+### A launch argument's `NO` isn't a Bool (Nov 15, 2026)
+
+`-ai.summarizeAutomatically NO` puts the string "NO" in the argument domain, so `object(forKey:) as? Bool ?? true` read it as missing and kept summarizing. `bool(forKey:)` understands "NO", "0" and "false" strings, so settings that default to on are now read as "on if missing, else `bool(forKey:)`". The demo video turns automatic summaries off this way.

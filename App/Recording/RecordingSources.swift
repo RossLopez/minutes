@@ -10,6 +10,10 @@ enum RecordingSources {
     ) -> (mic: any AudioCaptureSource, system: any AudioCaptureSource) {
         #if DEBUG
             if useFakeAudio {
+                if DemoContent.isOn {
+                    return (FakeAudioSource(frequency: 300, demoSide: .mine),
+                            FakeAudioSource(frequency: 500, demoSide: .others))
+                }
                 return (FakeAudioSource(frequency: 300), FakeAudioSource(frequency: 500))
             }
         #endif

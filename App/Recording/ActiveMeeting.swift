@@ -25,9 +25,15 @@ final class ActiveMeeting {
             voiceProcessing: RecordingPreferences.voiceProcessing,
             deviceUID: RecordingPreferences.inputDeviceUID,
         )
-        folder = try library.createMeetingFolder(startedAt: startDate, title: "Recording")
+        var title = "Recording"
+        #if DEBUG
+            if DemoContent.isOn {
+                title = DemoContent.title
+            }
+        #endif
+        folder = try library.createMeetingFolder(startedAt: startDate, title: title)
         metadata = MeetingMetadata(
-            title: "Recording",
+            title: title,
             startedAt: startDate,
             audioFormat: RecordingPreferences.audioFormat.rawValue,
             voiceProcessing: options.voiceProcessing,

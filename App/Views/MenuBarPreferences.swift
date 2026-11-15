@@ -16,7 +16,9 @@ final class MenuBarPreferences {
     }
 
     private init() {
-        showsIcon = UserDefaults.standard.object(forKey: Self.showsIconKey) as? Bool ?? true
+        // `bool(forKey:)` also understands a launch argument's "NO", a string rather than a Bool.
+        showsIcon = UserDefaults.standard.object(forKey: Self.showsIconKey) == nil
+            || UserDefaults.standard.bool(forKey: Self.showsIconKey)
     }
 
     /// Settings opens from a view, and the menu bar label is the one that's always there. When it's
