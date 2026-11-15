@@ -6,4 +6,4 @@
 
 #include "Signing.xcconfig"
 
-SPARKLE_PUBLIC_KEY =
+SPARKLE_PUBLIC_KEY = xhTZB7vxP94AaKNqHBGksq25ZCjnua7yxBVLoGYtHLY=

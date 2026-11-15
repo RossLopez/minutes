@@ -4,7 +4,7 @@ All notable changes to Minutes are listed here. The format follows [Keep a Chang
 
 ## [Unreleased]
 
-## [0.1.0] - 2026-11-14
+## [0.1.0] - 2026-11-15
 
 The first release.
 
