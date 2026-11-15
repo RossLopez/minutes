@@ -74,6 +74,16 @@ jobs:
       - name: Verify app bundle
         run: scripts/verify-bundle.sh build/Build/Products/Release/Minutes.app
 
+      - name: Check the Homebrew cask template
+        run: scripts/render-cask.sh --check
+
+      # The release workflow's build, ad-hoc signed, so a broken DMG shows up before a tag.
+      - name: Build a release DMG
+        run: |
+          python3 -m venv build/dmgbuild
+          build/dmgbuild/bin/pip install --require-hashes -r packaging/dmg/requirements.txt
+          DMGBUILD=build/dmgbuild/bin/dmgbuild scripts/build-release.sh 0.0.0-ci
+
       # Uses fake audio sources, because nothing can grant this runner audio permissions.
       - name: UI test
         run: >

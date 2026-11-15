@@ -4,6 +4,26 @@ Spec-level decisions, and places where Apple APIs behave differently than docume
 
 ## Decisions
 
+### Homebrew updates its copies, and Sparkle the rest (Nov 14, 2026)
+
+The spec's cask has `auto_updates true`. It doesn't: Homebrew updates copies it installed, with `brew upgrade --cask minutes`, so it always knows which version is there. In those copies Sparkle never starts. `UpdateCenter` treats the app as a Homebrew install when `Caskroom/minutes` exists under `$HOMEBREW_PREFIX`, `/opt/homebrew` or `/usr/local`, and Settings › General says to use `brew upgrade` instead of offering checks. Copies from the DMG update through Sparkle, with checks the user can turn off. Builds without `SPARKLE_PUBLIC_KEY`, which is every Debug build and every fork, never check.
+
+### The cask says `:golden_gate`, not `">= :golden_gate"` (Nov 14, 2026)
+
+Homebrew 7's `brew style` rejects the string form: a bare `depends_on macos: :golden_gate` already means that version or later. It also rejects a `desc` that names the platform, so it doesn't say "for Mac". `brew audit --cask --strict` passes on the template.
+
+### Sparkle's XPC services stay in the bundle (Nov 14, 2026)
+
+The plan was to strip them, since Minutes isn't sandboxed and doesn't need them. Removing files from `Sparkle.framework` after the build would mean signing it again by hand, outside the Developer ID export. Instead `SUEnableInstallerLauncherService` and `SUEnableDownloaderService` are false, so they're never launched, and `SUEnableSystemProfiling` is false, so nothing about the Mac is sent. Notarization accepts the framework as it comes.
+
+### The first run replaces the consent alert (Nov 14, 2026)
+
+The consent note is now a step of the first-run sheet, with the same text and the same `consentNoteShown` key, so anyone who saw the alert skips it. Every step but the welcome and the end can be skipped. The update choice on the last step sets Sparkle's `automaticallyChecksForUpdates`, so Sparkle never asks for itself.
+
+### The demo library is written by the screenshot test (Nov 14, 2026)
+
+The plan had a demo library checked in. Instead `ScreenshotUITests` writes it through `MinutesStorage` and `MinutesSearch`, which the UI test target now links, so it's always in the current format and no audio goes into git. The test runner is sandboxed and can't write to `docs/`, so screenshots are kept as test attachments, and `scripts/make-screenshots.sh` exports them from the result bundle.
+
 ### Note times are kept beside the notes, by fingerprint (Nov 12, 2026)
 
 `notes.md` holds the notes exactly as typed. Each line's time goes in `notes.json` with a 6-byte salted SHA-256 fingerprint of the line, never its text, so a line deleted from `notes.md` in another editor is really gone. On load, the fingerprints are lined up with the file's lines, and only unchanged lines keep their times. The times aren't in `meeting.json` because during a recording `ActiveMeeting` owns that file and writes all of it when capture stops, which would overwrite what the editor put there.
@@ -343,6 +363,19 @@ On the M5 Pro with 24 GB, release `minutes-llmcheck` with the built-in runtime u
 - **Through llama-server** the 12B's answers matched the built-in run's word for word.
 - **The 12B stays the recommended model** for chat, as for summaries and cleanup.
 
+## Milestone 9 measurements (Nov 14, 2026)
+
+On the M5 Pro, with ad-hoc signing. Nothing has been signed with Developer ID or notarized yet.
+
+- **The DMG** for 0.1.0 is 13 MB, and passes `verify-bundle.sh --release` and `codesign --verify --strict --deep`.
+- **Updates, end to end,** with a throwaway key and an appcast on `localhost`, using Debug builds under a test bundle ID so the real settings and library weren't touched:
+  - Build 100 found build 101, showed its Markdown notes from `CHANGELOG.md`, checked the signature, installed it and relaunched as 101.
+  - An appcast for build 102 signed with a different key was refused with "The update is improperly signed", and the app stayed at 101.
+- **Homebrew:** a local tap passed `brew style` and `brew audit --cask --strict`. Installed with `--appdir` to a scratch folder, the app said Homebrew updates it and showed no Check for Updates. `--zap` wasn't run on this Mac, because its paths are the real app's preferences.
+- **Screenshots:** `scripts/make-screenshots.sh` takes 10, 3.9 MB in all at 2x.
+
+**Testing an update on this Mac:** a relaunched app loses its launch arguments, so the test feed has to go in the test bundle's defaults (`defaults write <bundle ID> SUFeedURL <url>`), and be deleted afterwards. Signing a Debug copy again ad-hoc changes its Team ID, and it then fails to load `Minutes.debug.dylib`. Sign it with the same Apple Development identity instead.
+
 ## Apple API notes
 
 Measurements are from a MacBook Pro on macOS 27.0.1 with a quiet test tone played by `afplay`, unless a note says otherwise.
@@ -627,3 +660,27 @@ Hiding the pending turn and turning off the scroll both stopped it. So did turni
 - **Summary tab:** it streams into the same selectable Markdown view, but regenerating a summary while reading the window didn't crash. Watch for it there.
 - **How to reproduce:** read the window's accessibility tree, for example with the computer-use tool or Accessibility Inspector, right after pressing Ask.
 - **Debugger:** the debugger can't name the node, because expressions need stack the crashed thread no longer has.
+
+### `@AppStorage` in a `MenuBarExtra(isInserted:)` binding loops forever (Nov 14, 2026)
+
+On macOS 27, binding `MenuBarExtra(isInserted:)` to anything that reads `@AppStorage` in the `App` struct, whether `$showsIcon` or a computed `Binding`, kept the main thread at 99% from launch. The window never finished loading, and every UI test failed with "has not loaded accessibility". A `@State` binding was fine. The switch now lives in `MenuBarPreferences`, an `@Observable` singleton that writes `UserDefaults` itself.
+
+### Headings aren't static texts to XCUI (Nov 14, 2026)
+
+A `Text` with `.accessibilityAddTraits(.isHeader)` isn't found by `app.staticTexts[...]`. `app.descendants(matching: .any)` with `label == %@ OR value == %@` finds it.
+
+### The appearance and window size can't be set from launch arguments (Nov 14, 2026)
+
+`-AppleInterfaceStyle Light` or `Dark` as a launch argument didn't change the app's appearance on macOS 27, and `-NSWindow Frame main` didn't change the size the main window came back at. The SwiftUI `Window` has the identifier `main` but an empty `frameAutosaveName`, though its frame is saved as `NSWindow Frame main`. In Debug builds, `MINUTES_APPEARANCE` sets `NSApp.appearance`, and `MINUTES_WINDOW_SIZE` resizes the window with that identifier, again after SwiftUI restores the saved frame.
+
+### XCUI can lose a toolbar button's frame after a resize (Nov 14, 2026)
+
+After the window is resized in code, `app.buttons["toolbarRecord"]` was sometimes found with the frame `{{inf, inf}, {0, 0}}`, and clicking it failed as not hittable, though the hierarchy printed at the failure showed it in place. Whether it happened changed from run to run. The screenshot test waits for it to be hittable, then clicks its place in the window if it never is.
+
+### dmgbuild settings files have no `__file__` (Nov 14, 2026)
+
+dmgbuild runs `settings.py` with `exec`, so `__file__` isn't defined and paths can't be found next to it. `build-release.sh` passes the folder with `-D here=...`. It finds `background@2x.png` beside `background.png` by itself.
+
+### Finder's bottom bar covers the bottom of a DMG window (Nov 14, 2026)
+
+On macOS 27, Finder draws its path and status bar over the bottom of the window even when the DMG's settings hide them, covering the text at the bottom of the background. The window is 440 points tall for a 400-point background, with the icons and text placed in the top part.

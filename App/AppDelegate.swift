@@ -9,6 +9,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             RecordingController.shared.toggle()
         }
         GlobalHotKey.shared.register(HotKeyShortcut.load())
+        UpdateCenter.shared.start()
+        #if DEBUG
+            ScreenshotMode.apply()
+        #endif
 
         Task {
             await LibraryStore.shared.refresh()

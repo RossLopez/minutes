@@ -2,11 +2,13 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Checks that a built Minutes.app matches the spec's platform decisions.
-# Usage: scripts/verify-bundle.sh path/to/Minutes.app
+# Usage: scripts/verify-bundle.sh path/to/Minutes.app [--release]
+# --release checks a Release build whose path doesn't say so, like an exported archive.
 
 set -euo pipefail
 
-app="${1:?Usage: verify-bundle.sh path/to/Minutes.app}"
+app="${1:?Usage: verify-bundle.sh path/to/Minutes.app [--release]}"
+release_build="${2:-}"
 plist="$app/Contents/Info.plist"
 binary="$app/Contents/MacOS/Minutes"
 failures=0
@@ -41,6 +43,26 @@ check "minimum macOS" "27.0" "$(plist_value LSMinimumSystemVersion)"
 check_present "NSMicrophoneUsageDescription" "$(plist_value NSMicrophoneUsageDescription)"
 check_present "NSAudioCaptureUsageDescription" "$(plist_value NSAudioCaptureUsageDescription)"
 
+check "icon name" "AppIcon" "$(plist_value CFBundleIconName)"
+for file in AppIcon.icns Assets.car; do
+    if [[ -f "$app/Contents/Resources/$file" ]]; then
+        echo "ok    icon: $file present"
+    else
+        echo "FAIL  icon: $file missing"
+        failures=$((failures + 1))
+    fi
+done
+
+check "update feed" "https://github.com/RossLopez/minutes/releases/latest/download/appcast.xml" "$(plist_value SUFeedURL)"
+check "update system profile" "false" "$(plist_value SUEnableSystemProfiling)"
+sparkle="$app/Contents/Frameworks/Sparkle.framework"
+if [[ -d "$sparkle" ]] && codesign --verify --strict "$sparkle" 2>/dev/null; then
+    echo "ok    Sparkle.framework: present and signed"
+else
+    echo "FAIL  Sparkle.framework: missing or unsigned"
+    failures=$((failures + 1))
+fi
+
 if [[ -f "$app/Contents/Resources/THIRD_PARTY_NOTICES.md" ]]; then
     echo "ok    third-party notices: present"
 else
@@ -58,7 +80,7 @@ fi
 check "llama.framework has arm64" "yes" "$(lipo -archs "$llama/llama" 2>/dev/null | grep -qw arm64 && echo yes || echo no)"
 
 # Debug builds can swap in fake engines for UI tests. Release builds must not contain them.
-if [[ "$app" == *"/Release/"* ]]; then
+if [[ "$app" == *"/Release/"* || "$release_build" == "--release" ]]; then
     if strings -a "$binary" | grep -qE 'MINUTES_FAKE_(TRANSCRIPTION|DIARIZATION|LLM)'; then
         echo "FAIL  fake engines: present in a Release build"
         failures=$((failures + 1))

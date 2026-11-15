@@ -1,0 +1,23 @@
+# Changelog
+
+All notable changes to Minutes are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
+
+## [Unreleased]
+
+## [0.1.0] - 2026-11-14
+
+The first release.
+
+### Added
+
+- Record your microphone and the audio your Mac plays as two tracks, with level meters, recovery after a crash, and a menu bar item and global shortcut to start and stop.
+- Transcribe on your Mac with Apple's speech engine or Parakeet, with custom vocabulary.
+- Tell speakers apart, name them, merge and reassign them, and optionally remember voices.
+- Summaries from a built-in Gemma 4 model or an OpenAI-compatible server you choose, with editable templates.
+- Notes during a meeting, tied to the moment you typed them, and an AI cleanup you review before accepting.
+- Search across every meeting, chat about your meetings with answers that cite the moment they came from, and ask about a single meeting.
+- Export a meeting as Markdown or plain text.
+- A first-run guide, updates through Sparkle or Homebrew, and a signed, notarized DMG.
+
+[Unreleased]: https://github.com/RossLopez/minutes/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/RossLopez/minutes/releases/tag/v0.1.0

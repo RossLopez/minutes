@@ -1,0 +1,9 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// Release builds: the signing settings, plus the public half of the key that signs updates.
+// The private half is the SPARKLE_ED_PRIVATE_KEY secret, never in the repo (docs/RELEASING.md).
+// While this is empty, the app doesn't check for updates, which is how forks build.
+
+#include "Signing.xcconfig"
+
+SPARKLE_PUBLIC_KEY =

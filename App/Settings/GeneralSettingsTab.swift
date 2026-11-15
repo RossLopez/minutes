@@ -34,6 +34,7 @@ struct GeneralSettingsTab: View {
                 Text("\(failedShortcut) isn't available. Another app may be using it.")
                     .foregroundStyle(.secondary)
             }
+            StartupSettingsSection()
         }
         .formStyle(.grouped)
         .onDisappear(perform: stopCapturing)

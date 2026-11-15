@@ -51,5 +51,19 @@
 	<string>Minutes connects to model servers you add on your network, such as LM Studio on another Mac, to write summaries.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Minutes records your microphone during a meeting, so it can transcribe what you say. It stays on this Mac.</string>
+	<!-- Sparkle: the update feed, attached to the latest GitHub release. Checking fetches only this file. -->
+	<key>SUFeedURL</key>
+	<string>https://github.com/RossLopez/minutes/releases/latest/download/appcast.xml</string>
+	<!-- From Config/Release.xcconfig. Empty in Debug builds and forks, which then don't check for updates. -->
+	<key>SUPublicEDKey</key>
+	<string>$(SPARKLE_PUBLIC_KEY)</string>
+	<!-- Never send Sparkle's anonymous system profile. -->
+	<key>SUEnableSystemProfiling</key>
+	<false/>
+	<!-- Not sandboxed, so Sparkle installs without its XPC services. -->
+	<key>SUEnableInstallerLauncherService</key>
+	<false/>
+	<key>SUEnableDownloaderService</key>
+	<false/>
 </dict>
 </plist>

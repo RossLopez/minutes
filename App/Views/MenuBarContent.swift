@@ -38,6 +38,8 @@ struct MenuBarContent: View {
             openWindow(id: SceneID.mainWindow)
         }
 
+        CheckForUpdatesButton()
+
         Button("Settings…") {
             NSApplication.shared.activate()
             openSettings()

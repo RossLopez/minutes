@@ -52,7 +52,7 @@ class MinutesUITestCase: XCTestCase {
 
     @MainActor
     func launch(holdingTranscription: Bool = false, diarizing: Bool = false, summarizing: Bool = false,
-                tab: String = "transcript", environment: [String: String] = [:])
+                tab: String? = "transcript", environment: [String: String] = [:], arguments: [String] = [])
     {
         if !holdingTranscription {
             FileManager.default.createFile(atPath: releaseFile.path, contents: nil)
@@ -71,11 +71,17 @@ class MinutesUITestCase: XCTestCase {
         app.launchEnvironment.merge(environment) { $1 }
         // The app shares its settings with the real one, so pin the ones these tests depend on.
         app.launchArguments += ["-consentNoteShown", "YES", "-speakers.remembersVoices", "NO"]
-        app.launchArguments += ["-general.yourName", "Robin", "-meeting.tab", tab]
+        app.launchArguments += ["-firstRun.completed", "YES"]
+        app.launchArguments += ["-general.yourName", "Robin"]
+        // A launch argument wins over the app's own writes, so with one, clicking a tab does nothing.
+        if let tab {
+            app.launchArguments += ["-meeting.tab", tab]
+        }
         app.launchArguments += ["-ai.summarizeAutomatically", "YES", "-ai.defaultTemplate", "Default"]
         // Typed text arrives as typed, whatever this Mac's keyboard settings.
         app.launchArguments += ["-NSAutomaticSpellingCorrectionEnabled", "NO"]
         app.launchArguments += ["-NSAutomaticCapitalizationEnabled", "NO"]
+        app.launchArguments += arguments
         app.launch()
     }
 

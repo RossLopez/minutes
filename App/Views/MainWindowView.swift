@@ -1,16 +1,24 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import MinutesLLM
 import MinutesSearch
 import SwiftUI
 
 struct MainWindowView: View {
     @AppStorage(RecordingPreferences.consentNoteShownKey) private var consentNoteShown = false
+    @AppStorage(FirstRunView.completedKey) private var firstRunCompleted = false
+    /// UI tests walk through the first run without touching this Mac's settings.
+    @State private var showsTestFirstRun = FirstRunView.isForcedForTesting
     @FocusState private var isSearchFocused: Bool
     private let controller = RecordingController.shared
     private let store = LibraryStore.shared
 
     private var sidebarSelection: Binding<SidebarItem?> {
         Binding(get: { store.sidebarItem }, set: { store.sidebarItem = $0 ?? .allMeetings })
+    }
+
+    private var hasBuiltInModel: Bool {
+        ModelCatalog.all.contains { SummaryCenter.shared.states[$0.id].map { $0 != .notInstalled } ?? false }
     }
 
     private var isPlayerShowing: Bool {
@@ -101,17 +109,18 @@ struct MainWindowView: View {
             // Keeps the recording status above the player and a chat's question bar.
             .padding(.bottom, (isPlayerShowing ? 104 : 0) + (store.chatInputHeights.values.max() ?? 0))
         }
-        .alert("Recording Consent", isPresented: .constant(!consentNoteShown)) {
-            Button("OK") {
-                consentNoteShown = true
+        .sheet(isPresented: .constant(!firstRunCompleted || showsTestFirstRun)) {
+            FirstRunView(steps: FirstRunView.steps(
+                consentShown: consentNoteShown && !showsTestFirstRun,
+                hasModel: hasBuiltInModel && !showsTestFirstRun,
+            )) {
+                if showsTestFirstRun {
+                    showsTestFirstRun = false
+                } else {
+                    consentNoteShown = true
+                    firstRunCompleted = true
+                }
             }
-        } message: {
-            Text(
-                """
-                Some places require everyone's consent to record a conversation. Getting it is up to you. \
-                If you turn on Remember voices, the same goes for saving the voices of the people you name.
-                """,
-            )
         }
         .frame(minWidth: 800, minHeight: 500)
     }
