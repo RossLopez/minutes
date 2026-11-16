@@ -73,6 +73,8 @@ targets:
     platform: macOS
     sources:
       - path: AppUITests
+      # The demo meeting, shared with the app's demo mode so both say the same thing.
+      - path: App/Demo/DemoContent.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: io.github.rosslopez.minutes.uitests

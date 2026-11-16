@@ -34,7 +34,9 @@ enum DemoLibrary {
     static let featuredTitle = "Website launch check-in"
 
     /// Writes the library into `root`. `writeAudio` writes a quiet track of the given length.
-    static func write(to root: URL, writeAudio: (URL, Int) throws -> Void) throws {
+    /// Without `includingFeatured`, the website meeting and its chat are left out, for the demo
+    /// video to record them.
+    static func write(to root: URL, includingFeatured: Bool = true, writeAudio: (URL, Int) throws -> Void) throws {
         let library = MinutesLibrary(root: root)
         try library.prepareLayout()
         let calendar = Calendar.current
@@ -45,13 +47,31 @@ enum DemoLibrary {
             dividingBy: 900,
         ))
 
-        let featured = websiteLaunch(startedAt: max(quarter, today))
-        let (id, segments) = try write(featured, in: library, writeAudio: writeAudio)
         _ = try write(gardenClub(startedAt: today.addingTimeInterval(-86400 + 14.5 * 3600)), in: library,
                       writeAudio: writeAudio)
         _ = try write(volunteerSchedule(startedAt: today.addingTimeInterval(-4 * 86400 + 9.25 * 3600)),
                       in: library, writeAudio: writeAudio)
-        try writeChat(about: featured, id: id, segments: segments, in: library)
+        if includingFeatured {
+            let featured = websiteLaunch(startedAt: max(quarter, today))
+            let (id, segments) = try write(featured, in: library, writeAudio: writeAudio)
+            try writeChat(about: featured, id: id, segments: segments, in: library)
+        }
+    }
+
+    /// Saved voices for the demo meeting's people, as Remember voices keeps them. Priya and Marcus
+    /// match the demo mode's made-up voices exactly, so they're named; Elena only partly, so she's
+    /// offered as a suggestion.
+    static func writeVoices(to root: URL) throws {
+        let store = MinutesLibrary(root: root).speakerProfiles
+        let earlier = Date(timeIntervalSinceNow: -7 * 86400)
+        func sample(_ embedding: [Float]) -> VoiceSample {
+            VoiceSample(meeting: UUID(), recordedAt: earlier, seconds: 90, embedding: embedding)
+        }
+        try store.addSample(sample(DemoContent.voice("s1")), toProfileNamed: "Priya", now: earlier)
+        try store.addSample(sample(DemoContent.voice("s2")), toProfileNamed: "Marcus", now: earlier)
+        // 0.6 alike: above the suggestion cutoff, below the one that names someone.
+        let elena = zip(DemoContent.voice("s3"), DemoContent.voice("me")).map { 0.6 * $0 + 0.8 * $1 }
+        try store.addSample(sample(elena), toProfileNamed: "Elena", now: earlier)
     }
 
     /// Returns the meeting's ID and its transcript's segments, for the chat's sources.
@@ -119,16 +139,9 @@ enum DemoLibrary {
                        meetingDate: meeting.startedAt, kind: kind, start: segment.map { segments[$0].start },
                        text: text)
         }
-        let answer = """
-        The launch moved to **Tuesday the 24th**, because nobody wanted to launch on a Friday with no \
-        one around to fix problems [1]. On the Monday before, there's a soft launch: Elena will ask five \
-        or six people to try the site and collect what they find [2].
-
-        Before then, Marcus finishes the pricing page and the small-screen menu fix by Wednesday [3].
-        """
         let turn = ChatTurn(
-            question: "When is the website launching, and what happens before it?",
-            answer: answer,
+            question: DemoContent.chatQuestion,
+            answer: DemoContent.chatAnswer,
             sources: [
                 source(1, kind: .transcript, segment: 10, text: segments[10].text),
                 source(2, kind: .transcript, segment: 22, text: segments[22].text),

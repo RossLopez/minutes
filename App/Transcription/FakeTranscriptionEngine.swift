@@ -29,6 +29,9 @@
             workFolder _: URL,
             progress: @escaping @Sendable (Double) -> Void,
         ) async throws -> [TranscriptWord] {
+            if DemoContent.isOn {
+                return try await demoWords(isSystem: audio.lastPathComponent == "system.m4a", progress: progress)
+            }
             progress(0.5)
             while !FileManager.default.fileExists(atPath: releaseFile.path) {
                 try await Task.sleep(for: .milliseconds(50))
@@ -37,6 +40,20 @@
             return audio.lastPathComponent == "system.m4a"
                 ? Self.words("Sounds good to me. I will send the updated numbers on Thursday.", from: 60)
                 : Self.words("Let's start the review. We need to agree the budget before Friday.", from: 10)
+        }
+
+        /// The demo meeting's words for one track, after a few seconds of progress to watch.
+        private func demoWords(isSystem: Bool, progress: @escaping @Sendable (Double) -> Void) async throws
+            -> [TranscriptWord]
+        {
+            for step in 1 ... 12 {
+                try await Task.sleep(for: .milliseconds(200))
+                progress(Double(step) / 12)
+            }
+            return DemoContent.layout()
+                .filter { ($0.code == "me") != isSystem }
+                .flatMap(\.words)
+                .map { TranscriptWord(text: $0.text, start: $0.start, end: $0.end) }
         }
 
         private static func words(_ line: String, from start: Double) -> [TranscriptWord] {
