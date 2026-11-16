@@ -6,5 +6,11 @@
 	     127.0.0.1, and the runner's sandbox refuses to listen without this. -->
 	<key>com.apple.security.network.server</key>
 	<true/>
+	<!-- The test runner only: DemoVideoUITests and scripts/record-demo.sh signal each other through
+	     this folder, since nothing outside the runner's sandbox may read its own container. -->
+	<key>com.apple.security.temporary-exception.files.absolute-path.read-write</key>
+	<array>
+		<string>/private/tmp/MinutesDemoVideo/</string>
+	</array>
 </dict>
 </plist>

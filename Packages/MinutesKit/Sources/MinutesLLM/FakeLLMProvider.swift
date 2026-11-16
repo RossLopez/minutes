@@ -9,15 +9,19 @@ public final class FakeLLMProvider: LLMProvider {
     public let id: String
     private let context: Int
     private let answer: @Sendable ([LLMMessage]) -> String
+    private let wordDelay: Duration
     private let prompts = Mutex<[[LLMMessage]]>([])
 
+    /// `wordDelay` paces the answer like a real model's, for a demo. Tests leave it at zero.
     public init(
         id: String = "fake",
         contextLength: Int = 32768,
+        wordDelay: Duration = .zero,
         answer: @escaping @Sendable ([LLMMessage]) -> String = { _ in "## Overview\nA fake summary." },
     ) {
         self.id = id
         context = contextLength
+        self.wordDelay = wordDelay
         self.answer = answer
     }
 
@@ -47,7 +51,11 @@ public final class FakeLLMProvider: LLMProvider {
                         return
                     }
                     continuation.yield(word.offset == 0 ? String(word.element) : " " + word.element)
-                    await Task.yield()
+                    if wordDelay > .zero {
+                        try? await Task.sleep(for: wordDelay)
+                    } else {
+                        await Task.yield()
+                    }
                 }
                 continuation.finish()
             }
