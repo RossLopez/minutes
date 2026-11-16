@@ -137,6 +137,16 @@ fi
 echo "==> Making $(basename "$dmg")"
 "$dmgbuild" -s packaging/dmg/settings.py -D app="$app" -D here="$PWD/packaging/dmg" "Minutes $version" "$dmg"
 
+# Check the copy people install, not just the export: making the DMG mustn't add anything, like a
+# Finder attribute, that breaks the app's signature.
+echo "==> Verifying the app in the DMG"
+mounted="$out/dmg-check"
+diskutil image attach --readOnly --nobrowse --mountPoint "$mounted" "$dmg" >/dev/null
+trap 'diskutil eject "$mounted" >/dev/null 2>&1 || true' EXIT
+codesign --verify --strict --deep --verbose=1 "$mounted/Minutes.app"
+diskutil eject "$mounted" >/dev/null
+trap - EXIT
+
 if [[ -n "$identity" ]]; then
     codesign --sign "$identity" --timestamp "$dmg"
 fi

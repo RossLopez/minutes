@@ -16,7 +16,8 @@ size = None  # Fit the contents.
 
 files = [app]
 symlinks = {"Applications": "/Applications"}
-hide_extensions = [app_name]
+# No hide_extensions: it marks the app with a com.apple.FinderInfo attribute after it's signed,
+# which `codesign --verify --strict` rejects. Finder hides the .app extension anyway.
 
 # background@2x.png beside it is picked up for Retina screens.
 background = os.path.join(here, "background.png")
