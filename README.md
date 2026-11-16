@@ -2,6 +2,8 @@
 
 A free, open source meeting recorder for Macs with Apple silicon. Minutes records your microphone and your Mac's audio on separate tracks, then transcribes the meeting, tells the speakers apart and writes a summary, all on your Mac. There are no accounts, nothing is uploaded, and it never joins your calls as a bot.
 
+https://github.com/user-attachments/assets/f9d876d3-aa36-4c25-8edd-ab8729887e9f
+
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/summary-dark.png">
   <img alt="A meeting's summary in Minutes, with its overview, key points and decisions, and the meeting list beside it" src="docs/screenshots/summary-light.png">
