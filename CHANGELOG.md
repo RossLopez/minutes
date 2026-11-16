@@ -4,6 +4,8 @@ All notable changes to Minutes are listed here. The format follows [Keep a Chang
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-16
+
 ### Added
 
 - A Settings button at the foot of the sidebar, so Settings opens from the main window as well as the app menu and the menu bar.
@@ -27,5 +29,6 @@ The first release.
 - Export a meeting as Markdown or plain text.
 - A first-run guide, updates through Sparkle or Homebrew, and a signed, notarized DMG.
 
-[Unreleased]: https://github.com/RossLopez/minutes/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/RossLopez/minutes/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/RossLopez/minutes/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/RossLopez/minutes/releases/tag/v0.1.0
