@@ -11,9 +11,10 @@ enum SummaryPreferences {
     static let automaticKey = "ai.summarizeAutomatically"
     static let defaultTemplateKey = "ai.defaultTemplate"
 
-    /// On until the user turns it off.
+    /// On until the user turns it off. Read with `bool(forKey:)`, which also understands a launch
+    /// argument's "NO", a string rather than a Bool.
     static var summarizesAutomatically: Bool {
-        UserDefaults.standard.object(forKey: automaticKey) as? Bool ?? true
+        UserDefaults.standard.object(forKey: automaticKey) == nil || UserDefaults.standard.bool(forKey: automaticKey)
     }
 
     static var defaultTemplate: String {
@@ -86,8 +87,17 @@ final class SummaryCenter {
             if ProcessInfo.processInfo.environment["MINUTES_FAKE_LLM"] == "1" {
                 // The screenshots name it as a real model would be named.
                 let id = ProcessInfo.processInfo.environment["MINUTES_FAKE_LLM_NAME"] ?? fakeModelID
-                return FakeLLMProvider(id: id) { messages in
-                    if messages.first?.content.contains("You answer questions about the user's meetings") == true {
+                let demo = DemoContent.isOn
+                return FakeLLMProvider(id: id, wordDelay: demo ? .milliseconds(28) : .zero) { messages in
+                    let isChat = messages.first?.content.contains("You answer questions about the user's meetings")
+                        == true
+                    if demo, isChat {
+                        return DemoContent.chatAnswer
+                    }
+                    if demo, messages.first?.content.contains("tidy up notes") != true {
+                        return DemoContent.summary
+                    }
+                    if isChat {
                         // Cites the first source, and a number that doesn't exist, which is dropped.
                         let sources = messages.last?.content.components(separatedBy: "\n[").count ?? 1
                         return "A fake answer from \(sources - 1) sources [1]. Nothing else [9]."

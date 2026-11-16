@@ -70,17 +70,20 @@ class MinutesUITestCase: XCTestCase {
         }
         app.launchEnvironment.merge(environment) { $1 }
         // The app shares its settings with the real one, so pin the ones these tests depend on.
-        app.launchArguments += ["-consentNoteShown", "YES", "-speakers.remembersVoices", "NO"]
-        app.launchArguments += ["-firstRun.completed", "YES"]
-        app.launchArguments += ["-general.yourName", "Robin"]
+        // `arguments` can set any of them differently: each is passed once, so it's clear which wins.
+        var pinned: [(String, String)] = [
+            ("consentNoteShown", "YES"), ("speakers.remembersVoices", "NO"), ("firstRun.completed", "YES"),
+            ("general.yourName", "Robin"), ("ai.summarizeAutomatically", "YES"), ("ai.defaultTemplate", "Default"),
+            // Typed text arrives as typed, whatever this Mac's keyboard settings.
+            ("NSAutomaticSpellingCorrectionEnabled", "NO"), ("NSAutomaticCapitalizationEnabled", "NO"),
+        ]
         // A launch argument wins over the app's own writes, so with one, clicking a tab does nothing.
         if let tab {
-            app.launchArguments += ["-meeting.tab", tab]
+            pinned.append(("meeting.tab", tab))
         }
-        app.launchArguments += ["-ai.summarizeAutomatically", "YES", "-ai.defaultTemplate", "Default"]
-        // Typed text arrives as typed, whatever this Mac's keyboard settings.
-        app.launchArguments += ["-NSAutomaticSpellingCorrectionEnabled", "NO"]
-        app.launchArguments += ["-NSAutomaticCapitalizationEnabled", "NO"]
+        for (key, value) in pinned where !arguments.contains("-" + key) {
+            app.launchArguments += ["-" + key, value]
+        }
         app.launchArguments += arguments
         app.launch()
     }
