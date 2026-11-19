@@ -4,6 +4,12 @@ Spec-level decisions, and places where Apple APIs behave differently than docume
 
 ## Decisions
 
+### Parakeet's vocabulary step runs without FluidAudio's spotter rescue (Nov 19, 2026)
+
+With a 6-term list (ISCM, GCE, CCE, Splunk, Tenable, Joulix), Parakeet wrote terms over unrelated words all through real meetings: "either one of" became ISCM, "syntax" became Splunk, "Um" became ISCM. The cause is FluidAudio 0.18.2's spotter rescue in `VocabularyRescorer`. Wherever the CTC keyword spotter thinks it hears a term, it proposes that term over the words there, and it ignores the `minSimilarity` we pass. Its own similarity floor is off by default. It runs only for lists of 10 terms or fewer (`largeVocabThreshold`). The spike's list had 24 terms, so the spike never ran it and its zero false terms didn't cover short lists.
+
+`ParakeetEngine` now passes `VocabularyRescorer.Config(spotterRescueEnabled: false)`, so the result no longer depends on how long the list is. On the system track of a 30-minute meeting with that list, the terms counted 105 with the rescue on and 20 with it off. 20 is what Parakeet hears with no vocabulary at all, so on that meeting the strict step kept every real term and added none. Transcripts made before the fix keep the false terms until Transcribe Again.
+
 ### Homebrew updates its copies, and Sparkle the rest (Nov 14, 2026)
 
 The spec's cask has `auto_updates true`. It doesn't: Homebrew updates copies it installed, with `brew upgrade --cask minutes`, so it always knows which version is there. In those copies Sparkle never starts. `UpdateCenter` treats the app as a Homebrew install when `Caskroom/minutes` exists under `$HOMEBREW_PREFIX`, `/opt/homebrew` or `/usr/local`, and Settings › General says to use `brew upgrade` instead of offering checks. Copies from the DMG update through Sparkle, with checks the user can turn off. Builds without `SPARKLE_PUBLIC_KEY`, which is every Debug build and every fork, never check.

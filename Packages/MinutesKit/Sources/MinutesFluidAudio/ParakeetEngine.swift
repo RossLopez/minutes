@@ -133,6 +133,10 @@ private struct VocabularyBooster {
     private static let termAdvantage: Float = 0
     private static let minimumSimilarity: Float = 0.7
     private static let searchMarginSeconds = 0.5
+    /// FluidAudio's "spotter rescue" pass is off. It runs only for lists of 10 terms or fewer and
+    /// skips the similarity floor above, so with a short list it writes terms over unrelated words.
+    /// The spike used 24 terms, so it never ran there. See docs/NOTES.md.
+    static let rescorerConfig = VocabularyRescorer.Config(spotterRescueEnabled: false)
 
     private let context: CustomVocabularyContext
     private let spotter: CtcKeywordSpotter
@@ -161,7 +165,7 @@ private struct VocabularyBooster {
         rescorer = try await VocabularyRescorer.create(
             spotter: spotter,
             vocabulary: context,
-            config: .default,
+            config: Self.rescorerConfig,
             ctcModelDirectory: modelFolder,
         )
     }
