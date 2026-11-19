@@ -4,6 +4,10 @@ All notable changes to Minutes are listed here. The format follows [Keep a Chang
 
 ## [Unreleased]
 
+### Fixed
+
+- With Parakeet and a short vocabulary list, terms no longer appear in place of unrelated words. Use Transcribe Again on meetings transcribed before the fix.
+
 ## [0.2.0] - 2026-11-16
 
 ### Added
