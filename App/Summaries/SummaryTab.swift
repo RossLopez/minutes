@@ -15,6 +15,8 @@ struct SummaryTab: View {
     @State private var templates: [SummaryTemplate] = []
     @State private var confirmTemplate: String?
     @State private var previous: PreviousSummary?
+    /// Read with the text, not while drawing, so they aren't read again for every word written.
+    @State private var versions: [PreviousSummary] = []
 
     private var center: SummaryCenter {
         .shared
@@ -27,63 +29,40 @@ struct SummaryTab: View {
     private struct LoadKey: Equatable {
         let folder: URL
         let summary: MeetingMetadata.Summary?
+        /// A summary that's just been written is on disk before the library reads its new state,
+        /// so it's read again as soon as the writing stops.
+        let isWriting: Bool
     }
 
-    private var key: LoadKey {
-        LoadKey(folder: entry.id, summary: summary)
+    private func loadKey(for status: SummaryStatus) -> LoadKey {
+        LoadKey(folder: entry.id, summary: summary, isWriting: status.isWriting)
     }
 
     var body: some View {
         let status = center.status(for: entry)
-        // Color.clear is always there, so the tasks below run even while the switch has nothing
-        // to show, as for a finished summary whose text hasn't been read yet.
+        let key = loadKey(for: status)
+        // Color.clear is always there, so the tasks below run even while there's nothing to show,
+        // as for a finished summary whose text hasn't been read yet.
         ZStack(alignment: .top) {
             Color.clear
-            switch status {
-            case let .writing(stage, written):
-                content(written, status: status, stage: stage)
-            case .complete:
-                if let text {
-                    content(text, status: status, stage: nil)
-                } else if loadedKey == key {
-                    ContentUnavailableView(
-                        "Minutes Can't Read This Summary",
-                        systemImage: "exclamationmark.triangle",
-                        description: Text("summary.md is missing or isn't plain text."),
-                    )
-                }
-            case .waiting, .stopped, .failed:
-                if let text {
-                    content(text, status: status, stage: nil)
-                } else {
-                    centered { SummaryStatusView(entry: entry, status: status) }
-                }
-            case .needsModel:
-                if let text {
-                    content(text, status: status, stage: nil)
-                } else {
-                    NeedsModelView()
-                }
-            case .notStarted:
-                centered { SummaryStatusView(entry: entry, status: status) }
-            case .noTranscript:
-                ContentUnavailableView(
-                    "No Summary Yet",
-                    systemImage: "text.alignleft",
-                    description: Text("Minutes writes the summary once the transcript is ready."),
-                )
-            case .newerVersion:
-                ContentUnavailableView(
-                    "Made by a Newer Version of Minutes",
-                    systemImage: "arrow.up.circle",
-                    description: Text("Update Minutes to read or write this meeting's summary."),
-                )
+            // Every status with text to show goes through this one branch, so the toolbar, and a
+            // menu open in it, stays put as a summary finishes. One branch per status rebuilt the
+            // toolbar twice as a summary finished, closing the Previous Versions menu.
+            if let markdown = shownText(for: status) {
+                content(markdown, status: status)
+            } else {
+                placeholder(for: status, key: key)
             }
         }
         .task(id: key) {
             let folder = entry.folder
-            let key = key
-            text = await Task.detached { folder.loadSummary() }.value
+            let (loadedText, loadedVersions) = await Task.detached {
+                (folder.loadSummary(), folder.previousSummaries().map(PreviousSummary.init))
+            }.value
+            text = loadedText
+            if versions != loadedVersions {
+                versions = loadedVersions
+            }
             loadedKey = key
         }
         .task(id: center.templatesRevision) {
@@ -109,6 +88,51 @@ struct SummaryTab: View {
         }
     }
 
+    /// The summary as it's written, or the saved one, or `nil` when there's none to show.
+    private func shownText(for status: SummaryStatus) -> String? {
+        switch status {
+        case let .writing(_, written):
+            written
+        case .complete, .waiting, .stopped, .failed, .needsModel:
+            text
+        case .notStarted, .noTranscript, .newerVersion:
+            nil
+        }
+    }
+
+    @ViewBuilder
+    private func placeholder(for status: SummaryStatus, key: LoadKey) -> some View {
+        switch status {
+        case .complete:
+            if loadedKey == key {
+                ContentUnavailableView(
+                    "Minutes Can't Read This Summary",
+                    systemImage: "exclamationmark.triangle",
+                    description: Text("summary.md is missing or isn't plain text."),
+                )
+            }
+        case .waiting, .stopped, .failed, .notStarted:
+            centered { SummaryStatusView(entry: entry, status: status) }
+        case .needsModel:
+            NeedsModelView()
+        case .noTranscript:
+            ContentUnavailableView(
+                "No Summary Yet",
+                systemImage: "text.alignleft",
+                description: Text("Minutes writes the summary once the transcript is ready."),
+            )
+        case .newerVersion:
+            ContentUnavailableView(
+                "Made by a Newer Version of Minutes",
+                systemImage: "arrow.up.circle",
+                description: Text("Update Minutes to read or write this meeting's summary."),
+            )
+        case .writing:
+            // Always has text to show, even if it's empty so far.
+            EmptyView()
+        }
+    }
+
     private func centered(@ViewBuilder _ content: () -> some View) -> some View {
         content()
             .frame(maxWidth: 460)
@@ -116,7 +140,7 @@ struct SummaryTab: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private func content(_ markdown: String, status: SummaryStatus, stage _: Summarizer.Stage?) -> some View {
+    private func content(_ markdown: String, status: SummaryStatus) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             toolbar(status: status)
             if status != .complete, status != .needsModel {
@@ -148,7 +172,7 @@ struct SummaryTab: View {
                 ModelLabel(model: model, date: date, isOffNetwork: center.isOffNetwork(summary.model))
             }
             Spacer()
-            PreviousVersionsMenu(folder: entry.folder, selection: $previous)
+            PreviousVersionsMenu(versions: versions, selection: $previous)
             Button("Copy", systemImage: "doc.on.doc") {
                 copy()
             }
@@ -354,35 +378,5 @@ private struct NeedsModelView: View {
             .buttonStyle(.link)
         }
         .accessibilityIdentifier("summaryNeedsModel")
-    }
-}
-
-/// Who wrote the summary or cleanup, and a mark when it was a server outside the user's network.
-struct ModelLabel: View {
-    var verb = "Written by"
-    let model: String
-    let date: Date
-    let isOffNetwork: Bool
-    var identifier = "summaryModel"
-
-    var body: some View {
-        let when = date.formatted(date: .abbreviated, time: .shortened)
-        let written = isOffNetwork
-            ? "\(verb) \(model), outside your network, \(when)"
-            : "\(verb) \(model), \(when)"
-        HStack(spacing: 4) {
-            if isOffNetwork {
-                Image(systemName: "network")
-            }
-            Text(model)
-        }
-        .font(.caption)
-        .foregroundStyle(.secondary)
-        .lineLimit(1)
-        .fixedSize()
-        .help(written)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(written)
-        .accessibilityIdentifier(identifier)
     }
 }
