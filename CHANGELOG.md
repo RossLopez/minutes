@@ -4,6 +4,8 @@ All notable changes to Minutes are listed here. The format follows [Keep a Chang
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-19
+
 ### Fixed
 
 - With Parakeet and a short vocabulary list, terms no longer appear in place of unrelated words. Use Transcribe Again on meetings transcribed before the fix.
@@ -33,6 +35,7 @@ The first release.
 - Export a meeting as Markdown or plain text.
 - A first-run guide, updates through Sparkle or Homebrew, and a signed, notarized DMG.
 
-[Unreleased]: https://github.com/RossLopez/minutes/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/RossLopez/minutes/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/RossLopez/minutes/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/RossLopez/minutes/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/RossLopez/minutes/releases/tag/v0.1.0
