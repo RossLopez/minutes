@@ -45,6 +45,24 @@ struct SpeakerLabels: Equatable {
         speakers.filter { $0.id != id && $0.id != Transcript.Speaker.me }
     }
 
+    /// Tells speakers apart at a glance. Me takes the accent color and the unsorted Others stay grey.
+    /// Everyone else gets the next color in the order they first speak, so renaming someone keeps their color.
+    func color(_ id: String) -> Color {
+        switch id {
+        case Transcript.Speaker.me:
+            return .accentColor
+        case Transcript.Speaker.others:
+            return .secondary
+        default:
+            let voices = speakers.filter { $0.id != Transcript.Speaker.me && $0.id != Transcript.Speaker.others }
+            let index = voices.firstIndex { $0.id == id } ?? 0
+            return Self.palette[index % Self.palette.count]
+        }
+    }
+
+    /// System colors, so they adapt to dark mode and Increase Contrast. The first few read best as text.
+    private static let palette: [Color] = [.orange, .purple, .pink, .teal, .indigo, .brown, .green, .cyan]
+
     /// Whether the other voices still need telling apart.
     var hasUnidentifiedOthers: Bool {
         speakers.contains { $0.id == Transcript.Speaker.others }
