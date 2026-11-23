@@ -58,28 +58,20 @@ struct PlayerBar: View {
                     .accessibilityLabel("Length")
                     .accessibilityValue(MeetingFormatting.spokenTime(player.state.duration))
             }
-            HStack(spacing: 12) {
-                TrackToggle(player: player, track: .mic, name: "Me", onIcon: "mic", offIcon: "mic.slash")
-                TrackToggle(
-                    player: player,
-                    track: .system,
-                    name: "Others",
-                    onIcon: "person.2",
-                    offIcon: "person.2.slash",
-                )
-                Spacer()
-                Button(
-                    player.state.isPlaying ? "Pause" : "Play",
-                    systemImage: player.state.isPlaying ? "pause.fill" : "play.fill",
-                ) {
-                    player.togglePlayPause()
+            // The sides share the leftover width equally, so the transport stays in the true middle.
+            HStack(spacing: 0) {
+                HStack(spacing: 4) {
+                    TrackToggle(player: player, track: .mic, name: "Me", onIcon: "mic", offIcon: "mic.slash")
+                    TrackToggle(
+                        player: player,
+                        track: .system,
+                        name: "Others",
+                        onIcon: "person.2",
+                        offIcon: "person.2.slash",
+                    )
                 }
-                .labelStyle(.iconOnly)
-                .controlSize(.large)
-                .keyboardShortcut(isEditingText ? nil : KeyboardShortcut(.space, modifiers: []))
-                .disabled(!player.isReady)
-                .accessibilityIdentifier("playerPlayPause")
-                Spacer()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                transport
                 Picker("Speed", selection: Binding(get: { player.speed }, set: { player.setSpeed($0) })) {
                     ForEach(PlayerModel.speeds, id: \.self) { speed in
                         Text(MeetingFormatting.speed(speed)).tag(speed)
@@ -89,12 +81,68 @@ struct PlayerBar: View {
                 .fixedSize()
                 .disabled(!player.isReady)
                 .accessibilityIdentifier("playerSpeed")
+                .frame(maxWidth: .infinity, alignment: .trailing)
             }
         }
     }
+
+    private var transport: some View {
+        HStack(spacing: 18) {
+            SkipButton(player: player, seconds: -Self.skipSeconds)
+            Button {
+                player.togglePlayPause()
+            } label: {
+                Label(
+                    player.state.isPlaying ? "Pause" : "Play",
+                    systemImage: player.state.isPlaying ? "pause.fill" : "play.fill",
+                )
+                .labelStyle(.iconOnly)
+                .font(.title2)
+                .contentTransition(.symbolEffect(.replace))
+                .frame(width: 30, height: 30)
+            }
+            .buttonStyle(.glassProminent)
+            .buttonBorderShape(.circle)
+            .controlSize(.large)
+            .keyboardShortcut(isEditingText ? nil : KeyboardShortcut(.space, modifiers: []))
+            .disabled(!player.isReady)
+            .accessibilityIdentifier("playerPlayPause")
+            SkipButton(player: player, seconds: Self.skipSeconds)
+        }
+    }
+
+    private static let skipSeconds = 15.0
 }
 
-/// Turns one track on or off. A meeting missing that track can't turn it on.
+/// Jumps back or ahead by a fixed amount.
+private struct SkipButton: View {
+    let player: PlayerModel
+    let seconds: Double
+
+    private var isBack: Bool {
+        seconds < 0
+    }
+
+    private var title: String {
+        let amount = Int(abs(seconds))
+        return isBack ? "Back \(amount) Seconds" : "Forward \(amount) Seconds"
+    }
+
+    var body: some View {
+        Button(title, systemImage: isBack ? "gobackward.15" : "goforward.15") {
+            player.skip(by: seconds)
+        }
+        .labelStyle(.iconOnly)
+        .buttonStyle(.borderless)
+        .font(.title3)
+        .disabled(!player.isReady)
+        .help(title)
+        .accessibilityIdentifier(isBack ? "playerSkipBack" : "playerSkipForward")
+    }
+}
+
+/// Turns one track on or off. It stays quiet while the track plays and stands out once it's muted.
+/// A meeting missing that track can't turn it on.
 private struct TrackToggle: View {
     let player: PlayerModel
     let track: PlaybackTrack
@@ -107,14 +155,22 @@ private struct TrackToggle: View {
     }
 
     var body: some View {
-        Toggle(isOn: Binding(get: { isAudible }, set: { player.setMuted(!$0, track: track) })) {
+        Button {
+            player.setMuted(isAudible, track: track)
+        } label: {
             Label(name, systemImage: isAudible ? onIcon : offIcon)
+                .foregroundStyle(isAudible ? AnyShapeStyle(.secondary) : AnyShapeStyle(.orange))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(.orange.opacity(isAudible ? 0 : 0.15), in: .capsule)
+                .contentShape(.capsule)
         }
-        .toggleStyle(.button)
+        .buttonStyle(.plain)
         .disabled(!player.availableTracks.contains(track))
         .help(isAudible ? "Mute \(name)" : "Unmute \(name)")
         .accessibilityLabel(name)
         .accessibilityValue(isAudible ? "Playing" : "Muted")
+        .accessibilityAddTraits(.isToggle)
         .accessibilityIdentifier("playerTrack-\(track.rawValue)")
     }
 }

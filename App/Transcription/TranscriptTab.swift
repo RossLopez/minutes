@@ -243,6 +243,8 @@ private struct TranscriptList: View {
                         onPlay(line)
                     }
                     .tag(line.id)
+                    // Speaker colors and spacing separate the turns, so lines between them are only clutter.
+                    .listRowSeparator(.hidden)
                 }
             }
             .listStyle(.inset)
@@ -294,6 +296,8 @@ private struct TranscriptRow: View {
     let onPlay: () -> Void
 
     @State private var isNaming = false
+    /// Increased on the selected row, where a colored name would sit on the accent-colored highlight.
+    @Environment(\.backgroundProminence) private var prominence
 
     private var clock: String {
         MeetingFormatting.clock(line.start)
@@ -315,6 +319,7 @@ private struct TranscriptRow: View {
                 }
                 .buttonStyle(.plain)
                 .font(.callout.weight(.semibold))
+                .foregroundStyle(prominence == .increased ? .primary : editing.labels.color(line.speaker))
                 .disabled(!editing.isEnabled)
                 .help("Name this speaker")
                 .accessibilityIdentifier("speakerLabel")
@@ -329,7 +334,7 @@ private struct TranscriptRow: View {
             }
             Text(line.text)
         }
-        .padding(.vertical, 2)
+        .padding(.vertical, 5)
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(.rect)
         // Simultaneous, so a click also selects the row. It restarts a line that's already current.

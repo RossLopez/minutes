@@ -86,6 +86,12 @@ final class PlayerModel {
         player?.seek(to: seconds)
     }
 
+    /// Jumps back or ahead, staying inside the recording.
+    func skip(by seconds: Double) {
+        let target = min(max(state.currentTime + seconds, 0), state.duration)
+        player?.seek(to: target)
+    }
+
     func play(from seconds: Double) {
         player?.seek(to: seconds)
         player?.play()
