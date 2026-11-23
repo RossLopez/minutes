@@ -4,6 +4,22 @@ All notable changes to Minutes are listed here. The format follows [Keep a Chang
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-23
+
+### Added
+
+- Buttons in the player bar to skip back or ahead 15 seconds.
+- Each speaker's name in a transcript has its own color, so it's easier to see who's talking. You're in the accent color and unidentified voices are gray.
+
+### Changed
+
+- The play button is larger and sits in the middle of the player bar, and a muted track is marked in orange.
+- Transcript lines no longer have a divider between them.
+
+### Fixed
+
+- The Summary tab's Previous Versions menu no longer closes by itself when you open it just as a summary finishes.
+
 ## [0.2.1] - 2026-11-19
 
 ### Fixed
@@ -35,7 +51,8 @@ The first release.
 - Export a meeting as Markdown or plain text.
 - A first-run guide, updates through Sparkle or Homebrew, and a signed, notarized DMG.
 
-[Unreleased]: https://github.com/RossLopez/minutes/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/RossLopez/minutes/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/RossLopez/minutes/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/RossLopez/minutes/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/RossLopez/minutes/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/RossLopez/minutes/releases/tag/v0.1.0
