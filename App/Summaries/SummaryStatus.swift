@@ -28,6 +28,14 @@ extension SummaryStatus {
         default: false
         }
     }
+
+    var isWriting: Bool {
+        if case .writing = self {
+            true
+        } else {
+            false
+        }
+    }
 }
 
 extension SummaryCenter {

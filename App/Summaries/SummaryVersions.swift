@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import AppKit
-import MinutesStorage
 import SwiftUI
 
 /// An older summary in a meeting's `summaries/` folder, named `<yyyy-MM-dd HHmmss> <template>.md`.
@@ -35,11 +34,10 @@ struct PreviousSummary: Identifiable, Hashable {
 
 /// Lists a meeting's older summaries, newest first.
 struct PreviousVersionsMenu: View {
-    let folder: MeetingFolder
+    let versions: [PreviousSummary]
     @Binding var selection: PreviousSummary?
 
     var body: some View {
-        let versions = folder.previousSummaries().map(PreviousSummary.init)
         Menu("Previous Versions", systemImage: "clock.arrow.circlepath") {
             ForEach(versions) { version in
                 Button(version.title) {
