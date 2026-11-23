@@ -18,10 +18,24 @@ jobs:
   build-and-test:
     # macOS 27 with Xcode 27. The macos-26 and macos-latest images can't run this app's minimum OS.
     runs-on: xcode-27
-    # A full run takes about 5 minutes. Without a limit, a hang runs for GitHub's default of 6 hours.
+    # A full run takes about 15 minutes, or 10 when a pull request skips the DMG. Without a limit, a
+    # hang runs for GitHub's default of 6 hours.
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # A pull request checks out a merge commit. Its first parent is the base branch, so the DMG
+          # step below can see what the pull request changed.
+          fetch-depth: 2
+
+      # SwiftPM and xcodebuild share this cache of package clones and binary downloads, so each run
+      # skips fetching FluidAudio, Sparkle and llama.cpp. An older cache still saves most of the fetch.
+      - name: Cache Swift packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/Library/Caches/org.swift.swiftpm
+          key: swiftpm-${{ runner.os }}-${{ hashFiles('Packages/MinutesKit/Package.resolved') }}
+          restore-keys: swiftpm-${{ runner.os }}-
 
       - name: Install build tools
         run: brew install xcodegen swiftlint swiftformat
@@ -62,23 +76,33 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
-      - name: Build app (ad-hoc signed)
-        run: >
-          xcodebuild build
-          -project Minutes.xcodeproj
-          -scheme Minutes
-          -configuration Release
-          -destination 'platform=macOS,arch=arm64'
-          -derivedDataPath build
-
-      - name: Verify app bundle
-        run: scripts/verify-bundle.sh build/Build/Products/Release/Minutes.app
-
       - name: Check the Homebrew cask template
         run: scripts/render-cask.sh --check
 
-      # The release workflow's build, ad-hoc signed, so a broken DMG shows up before a tag.
+      # The DMG takes about 5 minutes, so a pull request builds it only when it changes packaging,
+      # build settings or dependencies. Every push to main builds it. Because it's also the only
+      # Release build, a Release-only break in an ordinary pull request shows up on main, before a tag.
+      - name: Decide whether to build the DMG
+        id: dmg
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT" != pull_request ]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed=$(git diff --name-only HEAD^1 HEAD)
+          if echo "$changed" | grep -qE '^(\.github/workflows/|scripts/(build-release|verify-bundle)\.sh$|packaging/|Config/|project\.yml$|App/(Info\.plist|Minutes\.entitlements|AppIcon\.icon/)|Packages/MinutesKit/Package\.(swift|resolved)$)'; then
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No packaging, build setting or dependency changes, so this pull request skips the DMG."
+            echo "build=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # The release workflow's build, ad-hoc signed, so a broken DMG shows up before a tag. It's also
+      # this run's Release build: the script runs verify-bundle.sh on the exported app.
       - name: Build a release DMG
+        if: steps.dmg.outputs.build == 'true'
         run: |
           python3 -m venv build/dmgbuild
           build/dmgbuild/bin/pip install --require-hashes -r packaging/dmg/requirements.txt

@@ -49,7 +49,9 @@ mkdir -p "$out/export"
 echo "==> Minutes $version ($build_number), $([[ -n "$identity" ]] && echo "signed by $identity" || echo "ad-hoc signed")"
 xcodegen generate
 
-settings=(MARKETING_VERSION="$version" CURRENT_PROJECT_VERSION="$build_number")
+# The generic destination builds every architecture, and package targets don't see the project's
+# ARCHS, so without this FluidAudio is also compiled for Intel, which the app never ships.
+settings=(ARCHS=arm64 MARKETING_VERSION="$version" CURRENT_PROJECT_VERSION="$build_number")
 if [[ "${UPDATES_OFF:-}" == 1 ]]; then
     settings+=(SPARKLE_PUBLIC_KEY=)
 elif [[ -n "${SPARKLE_PUBLIC_KEY:-}" ]]; then
