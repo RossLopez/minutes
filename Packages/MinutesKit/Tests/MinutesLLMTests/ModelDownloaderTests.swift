@@ -20,6 +20,8 @@ private struct StubRepository {
     var stallAfter: Int?
     var ignoresRange = false
     var requests: [URLRequest] = []
+    /// How much of the file the downloader has saved, so a dropped connection can wait for it.
+    var saved: (@Sendable () -> Int64)?
 }
 
 private let repositories = Mutex<[String: StubRepository]>([:])
@@ -86,9 +88,16 @@ private final class StubProtocol: URLProtocol {
             return
         }
         if let drop = stub.dropAfter {
-            client?.urlProtocol(self, didLoad: Data(rest.prefix(drop)))
-            // Failing at once can discard data URLSession hasn't delivered yet.
-            Thread.sleep(forTimeInterval: 0.05)
+            let sent = rest.prefix(drop)
+            client?.urlProtocol(self, didLoad: Data(sent))
+            // Failing before URLSession hands the data on discards it, and on a busy machine that can
+            // take far longer than any fixed wait, so wait until the downloader has saved it. The
+            // limit only stops a broken downloader from hanging the test.
+            let target = Int64(start + sent.count)
+            let deadline = ContinuousClock.now + .seconds(10)
+            while (stub.saved?() ?? target) < target, ContinuousClock.now < deadline {
+                Thread.sleep(forTimeInterval: 0.01)
+            }
             client?.urlProtocol(self, didFailWithError: URLError(.networkConnectionLost))
             return
         }
@@ -148,6 +157,7 @@ private func setUp(
         },
         availableSpace: { _ in space },
     )
+    repositories.withLock { $0[name]!.saved = { downloader.partial(for: model)?.received ?? 0 } }
     return (model, downloader)
 }
 
