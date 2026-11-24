@@ -10,7 +10,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         GlobalHotKey.shared.register(HotKeyShortcut.load())
         UpdateCenter.shared.start()
+        AppearancePreference.saved.apply()
         #if DEBUG
+            // After the saved appearance, so screenshots look the same whatever it is.
             ScreenshotMode.apply()
         #endif
 

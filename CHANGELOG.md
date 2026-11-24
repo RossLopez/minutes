@@ -4,6 +4,10 @@ All notable changes to Minutes are listed here. The format follows [Keep a Chang
 
 ## [Unreleased]
 
+### Added
+
+- An Appearance setting in Settings › General, to keep Minutes light or dark whatever your Mac is set to. It follows the Mac until you change it.
+
 ## [0.3.0] - 2026-11-23
 
 ### Added

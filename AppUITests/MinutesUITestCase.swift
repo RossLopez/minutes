@@ -74,6 +74,7 @@ class MinutesUITestCase: XCTestCase {
         var pinned: [(String, String)] = [
             ("consentNoteShown", "YES"), ("speakers.remembersVoices", "NO"), ("firstRun.completed", "YES"),
             ("general.yourName", "Robin"), ("ai.summarizeAutomatically", "YES"), ("ai.defaultTemplate", "Default"),
+            ("general.appearance", "system"),
             // Typed text arrives as typed, whatever this Mac's keyboard settings.
             ("NSAutomaticSpellingCorrectionEnabled", "NO"), ("NSAutomaticCapitalizationEnabled", "NO"),
         ]

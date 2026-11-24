@@ -9,6 +9,7 @@ struct GeneralSettingsTab: View {
     @State private var monitor: Any?
     @State private var failedShortcut: String?
     @AppStorage(SpeakerPreferences.yourNameKey) private var yourName = NSFullUserName()
+    @AppStorage(AppearancePreference.key) private var appearance = AppearancePreference.system
 
     var body: some View {
         Form {
@@ -34,6 +35,15 @@ struct GeneralSettingsTab: View {
                 Text("\(failedShortcut) isn't available. Another app may be using it.")
                     .foregroundStyle(.secondary)
             }
+            Picker("Appearance", selection: $appearance) {
+                ForEach(AppearancePreference.allCases) { choice in
+                    Text(choice.title).tag(choice)
+                }
+            }
+            .onChange(of: appearance) {
+                appearance.apply()
+            }
+            .accessibilityIdentifier("appearance")
             StartupSettingsSection()
         }
         .formStyle(.grouped)
